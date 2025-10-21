@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Confidence Survey - UIUC MS Business Analytics</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 8px;
+            border-radius: 4px;
+        }
+        input[type="range"]::-moz-range-track {
+            height: 8px;
+            border-radius: 4px;
+        }
+        .matrix-cell {
+            transition: all 0.2s;
+        }
+        .matrix-cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(to bottom right, #581c87, #312e81); color: white; font-family: sans-serif;">
+            <div style="text-align: center;">
+                <h1>Loading AI Confidence Survey...</h1>
+                <p>If this message persists, check browser console (F12)</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // API configuration
+        const API_BASE = '/api';
+
+        // Survey questions
+        const questions = [
+            "As of today, humans have access to sentient AI",
+            "AI will outperform humans on a standardized exam for Emotional Intelligence: EQ by 2030",
+            "I could compete in the job market without leveraging AI",
+            "A child born Fall 2025 will complete HS in Spring of 2044. Given the child attends your High School: The child will endure *less* hardships on the K-12 path aspiring access to higher education (UIUC) than I did",
+            "I understand how Machine Learning AI models make decisions",
+            "AI will have a net positive impact on your closest social circle/s in a decade in review by 2035"
+        ];
+
+        const App = () => {
+            const [currentPage, setCurrentPage] = useState('survey');
+            const [responses, setResponses] = useState(questions.map(() => 0));
+            const [allData, setAllData] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const [hasSubmitted, setHasSubmitted] = useState(false);
+
+            useEffect(() => {
+                const submitted = sessionStorage.getItem('surveySubmitted');
+                if (submitted === 'true') {
+                    setHasSubmitted(true);
+                }
+            }, []);
+
+            useEffect(() => {
+                if (hasSubmitted) {
+                    fetchAllData();
+                }
+            }, [hasSubmitted]);
+
+            const fetchAllData = async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/responses`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setAllData(data);
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch data:', err);
+                    setError('Unable to load data from server');
+                }
+            };
+
+            const handleSliderChange = (index, value) => {
+                const newResponses = [...responses];
+                newResponses[index] = parseFloat(value);
+                setResponses(newResponses);
+            };
+
+            const handleSubmit = async () => {
+                setLoading(true);
+                setError(null);
+
+                const timestamp = new Date().toISOString();
+                const newEntry = {
+                    timestamp,
+                    ...responses.reduce((acc, val, idx) => {
+                        acc[`q${idx + 1}`] = val;
+                        return acc;
+                    }, {})
+                };
+
+                try {
+                    const response = await fetch(`${API_BASE}/submit`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(newEntry)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        setResponses(questions.map(() => 0));
+                        sessionStorage.setItem('surveySubmitted', 'true');
+                        setHasSubmitted(true);
+                        alert(`Response submitted successfully! Total responses: ${result.count}\n\nAccess advanced analytics now available.`);
+                        await fetchAllData();
+                        setCurrentPage('charts');
+                    } else {
+                        throw new Error('Failed to submit response');
+                    }
+                } catch (err) {
+                    console.error('Error submitting response:', err);
+                    alert('Failed to submit response. Please try again.');
+                    setError('Failed to submit response');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const exportCSV = () => {
+                if (allData.length === 0) {
+                    alert('No data to export');
+                    return;
+                }
+                
+                const headers = ['Timestamp', ...questions.map((_, idx) => `Q${idx + 1}`)];
+                const csvContent = [
+                    headers.join(','),
+                    ...allData.map(entry => 
+                        [entry.timestamp, ...questions.map((_, idx) => entry[`q${idx + 1}`])].join(',')
+                    )
+                ].join('\n');
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `survey_data_${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950">
+                    <nav className="bg-purple-950 shadow-lg border-b border-purple-800">
+                        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between text-xs md:text-sm overflow-x-auto">
+                            <button onClick={() => setCurrentPage('survey')} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'survey' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:text-white'}`}>Survey</button>
+                            <button onClick={() => hasSubmitted ? setCurrentPage('data') : alert('Complete survey first')} disabled={!hasSubmitted} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'data' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}>Data {!hasSubmitted && '🔒'}</button>
+                            <button onClick={() => hasSubmitted ? setCurrentPage('charts') : alert('Complete survey first')} disabled={!hasSubmitted} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'charts' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}>Distributions {!hasSubmitted && '🔒'}</button>
+                            <button onClick={() => hasSubmitted ? setCurrentPage('regression') : alert('Complete survey first')} disabled={!hasSubmitted} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'regression' && hasSubmitted ? 'bg-green-600 text-white' : hasSubmitted ? 'text-green-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}>Regression {!hasSubmitted && '🔒'}</button>
+                            <button onClick={() => hasSubmitted ? setCurrentPage('analytics') : alert('Complete survey first')} disabled={!hasSubmitted} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'analytics' && hasSubmitted ? 'bg-cyan-600 text-white' : hasSubmitted ? 'text-cyan-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}>Advanced Analytics {!hasSubmitted && '🔒'}</button>
+                        </div>
+                    </nav>
+
+                    {currentPage === 'survey' && (
+                        <div className="max-w-md mx-auto px-4 py-6">
+                            <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                                <h1 className="text-2xl font-bold text-purple-100 mb-2">AI Confidence Survey</h1>
+                                <p className="text-sm text-purple-300 mb-6">UIUC MS Business Analytics Research</p>
+                                <p className="text-xs text-purple-400 mb-6 italic">Rate your confidence: Left (-1) = No confidence, Right (+1) = Full confidence</p>
+
+                                {questions.map((question, idx) => (
+                                    <div key={idx} className="mb-8">
+                                        <p className="text-sm font-medium text-purple-100 mb-3">{idx + 1}. {question}</p>
+                                        <div className="relative">
+                                            <input type="range" min="-1" max="1" step="0.01" value={responses[idx]} onChange={(e) => handleSliderChange(idx, e.target.value)} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" style={{background: `linear-gradient(to right, #ef4444 0%, #fbbf24 50%, #10b981 100%)`}} />
+                                            <div className="flex justify-between text-xs text-purple-300 mt-1">
+                                                <span>-1.0</span>
+                                                <span className="font-semibold text-amber-400">{responses[idx].toFixed(2)}</span>
+                                                <span>+1.0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                <button onClick={handleSubmit} disabled={loading} className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Submitting...' : 'Submit Response'}</button>
+                                <p className="text-xs text-center text-purple-400 mt-4">{allData.length} response{allData.length !== 1 ? 's' : ''} collected</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {currentPage === 'data' && (
+                        <div className="max-w-6xl mx-auto px-4 py-6">
+                            <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                                <h2 className="text-2xl font-bold text-purple-100 mb-4">Survey Dataset</h2>
+                                <p className="text-purple-300 text-sm mb-4">View all responses from the study.</p>
+                                <div className="flex gap-4 mb-6">
+                                    <button onClick={exportCSV} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition shadow-lg">Download CSV</button>
+                                </div>
+                                <p className="text-purple-300 mb-4">Total Responses: {allData.length}</p>
+                                {allData.length > 0 && (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full text-sm">
+                                            <thead className="bg-purple-800 bg-opacity-50">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left text-purple-200">Timestamp</th>
+                                                    {questions.map((_, idx) => (<th key={idx} className="px-4 py-2 text-left text-purple-200">Q{idx + 1}</th>))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {allData.slice(-10).reverse().map((entry, idx) => (
+                                                    <tr key={idx} className="border-t border-purple-700">
+                                                        <td className="px-4 py-2 text-purple-200">{new Date(entry.timestamp).toLocaleString()}</td>
+                                                        {questions.map((_, qIdx) => (<td key={qIdx} className="px-4 py-2 text-purple-200">{entry[`q${qIdx + 1}`].toFixed(2)}</td>))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        {allData.length > 10 && (<p className="text-xs text-purple-400 mt-2 text-center">Showing 10 most recent responses</p>)}
+                                    </div>
+                                )}
+                                {allData.length === 0 && (<p className="text-purple-400 text-center py-8">No data collected yet</p>)}
+                            </div>
+                        </div>
+                    )}
+
+                    {currentPage === 'charts' && hasSubmitted && (
+                        <ChartsPage data={allData} questions={questions} />
+                    )}
+
+                    {currentPage === 'regression' && hasSubmitted && (
+                        <RegressionPage data={allData} questions={questions} />
+                    )}
+
+                    {currentPage === 'analytics' && hasSubmitted && (
+                        <AdvancedAnalytics data={allData} questions={questions} />
+                    )}
+                </div>
+            );
+        };
+
+        // Charts Page with Histograms
+        const ChartsPage = ({ data, questions }) => {
+            const chartRefs = useRef([]);
+
+            useEffect(() => {
+                if (data.length === 0) return;
+
+                chartRefs.current.forEach(chart => { if (chart) chart.destroy(); });
+                chartRefs.current = [];
+
+                questions.forEach((question, idx) => {
+                    const canvas = document.getElementById(`chart-${idx}`);
+                    if (!canvas) return;
+
+                    const values = data.map(d => d[`q${idx + 1}`]);
+                    
+                    // Calculate mean and std
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+                    const std = Math.sqrt(variance);
+
+                    // Create bins with size 0.25
+                    const binSize = 0.25;
+                    const bins = {};
+                    for (let i = -1; i <= 1; i += binSize) {
+                        bins[i.toFixed(2)] = 0;
+                    }
+
+                    // Count values in each bin
+                    values.forEach(v => {
+                        const binKey = (Math.floor(v / binSize) * binSize).toFixed(2);
+                        if (bins[binKey] !== undefined) {
+                            bins[binKey]++;
+                        }
+                    });
+
+                    const binLabels = Object.keys(bins);
+                    const binCounts = Object.values(bins);
+
+                    // Plugin to draw vertical mean line at precise position
+                    const meanLinePlugin = {
+                        id: 'meanLine',
+                        afterDraw: (chart) => {
+                            const ctx = chart.ctx;
+                            const xAxis = chart.scales.x;
+                            const yAxis = chart.scales.y;
+                            
+                            // Calculate exact position of mean value
+                            // Map mean from [-1, 1] to pixel position
+                            const minVal = -1;
+                            const maxVal = 1;
+                            const chartWidth = xAxis.right - xAxis.left;
+                            
+                            // Calculate pixel position based on actual mean value
+                            const normalizedPosition = (mean - minVal) / (maxVal - minVal);
+                            const x = xAxis.left + (normalizedPosition * chartWidth);
+                            
+                            const topY = yAxis.top;
+                            const bottomY = yAxis.bottom;
+                            
+                            // Draw vertical line at precise position
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(x, topY);
+                            ctx.lineTo(x, bottomY);
+                            ctx.lineWidth = 3;
+                            ctx.strokeStyle = 'rgb(255, 0, 0)';
+                            ctx.setLineDash([5, 5]);
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    };
+
+                    const chart = new Chart(canvas, {
+                        type: 'bar',
+                        data: {
+                            labels: binLabels,
+                            datasets: [{
+                                label: 'Frequency',
+                                data: binCounts,
+                                backgroundColor: 'rgba(34, 211, 238, 0.7)',
+                                borderColor: 'rgba(34, 211, 238, 1)',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: {
+                                    display: true,
+                                    text: `Mean: ${mean.toFixed(3)} | Std: ${std.toFixed(3)}`,
+                                    color: '#fbbf24',
+                                    font: { size: 13, weight: 'bold' }
+                                }
+                            },
+                            scales: {
+                                x: { 
+                                    title: { display: true, text: 'Confidence Value', color: '#c4b5fd' },
+                                    ticks: { color: '#c4b5fd', maxRotation: 45, minRotation: 45 }, 
+                                    grid: { color: 'rgba(107, 33, 168, 0.2)' }
+                                },
+                                y: { 
+                                    title: { display: true, text: 'Count', color: '#c4b5fd' },
+                                    ticks: { color: '#c4b5fd', stepSize: 1 }, 
+                                    grid: { color: 'rgba(107, 33, 168, 0.2)' },
+                                    beginAtZero: true
+                                }
+                            }
+                        },
+                        plugins: [meanLinePlugin]
+                    });
+
+                    chartRefs.current.push(chart);
+                });
+
+                return () => { chartRefs.current.forEach(chart => { if (chart) chart.destroy(); }); };
+            }, [data, questions]);
+
+            if (data.length === 0) {
+                return (
+                    <div className="max-w-4xl mx-auto px-4 py-6">
+                        <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                            <p className="text-purple-400 text-center py-8">No data to display</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                        <h2 className="text-2xl font-bold text-purple-100 mb-2">Response Distributions</h2>
+                        <p className="text-purple-300 text-sm mb-6">Histograms with bin size 0.25 showing mean and standard deviation</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {questions.map((question, idx) => (
+                                <div key={idx} className="bg-purple-800 bg-opacity-30 rounded-lg p-4 border border-purple-700">
+                                    <h3 className="text-sm font-semibold text-purple-100 mb-2">Q{idx + 1}: {question.substring(0, 60)}...</h3>
+                                    <div style={{ height: '250px' }}>
+                                        <canvas id={`chart-${idx}`}></canvas>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Matrix helper functions for regression (defined outside component to avoid recreation)
+        const transpose = (matrix) => {
+            return matrix[0].map((_, i) => matrix.map(row => row[i]));
+        };
+
+        const matrixMultiply = (A, B) => {
+            const result = [];
+            for (let i = 0; i < A.length; i++) {
+                result[i] = [];
+                for (let j = 0; j < B[0].length; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < A[0].length; k++) {
+                        sum += A[i][k] * B[k][j];
+                    }
+                    result[i][j] = sum;
+                }
+            }
+            return result;
+        };
+
+        // Pseudo-inverse using SVD-like approach with regularization (handles singular matrices)
+        const invertMatrix = (matrix) => {
+            const n = matrix.length;
+            const augmented = matrix.map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => i === j ? 1 : 0)]);
+            
+            // Add small regularization to diagonal to handle near-singular matrices (Ridge regression approach)
+            const lambda = 1e-6;
+            for (let i = 0; i < n; i++) {
+                augmented[i][i] += lambda;
+            }
+            
+            for (let i = 0; i < n; i++) {
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
+                        maxRow = k;
+                    }
+                }
+                [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+                
+                const pivot = augmented[i][i];
+                if (Math.abs(pivot) < 1e-10) {
+                    console.warn('Matrix is highly singular even with regularization for row', i);
+                    // Continue with very small value instead of failing
+                    augmented[i][i] = 1e-8;
+                }
+                
+                const divisor = augmented[i][i];
+                for (let j = 0; j < 2 * n; j++) {
+                    augmented[i][j] /= divisor;
+                }
+                
+                for (let k = 0; k < n; k++) {
+                    if (k !== i) {
+                        const factor = augmented[k][i];
+                        for (let j = 0; j < 2 * n; j++) {
+                            augmented[k][j] -= factor * augmented[i][j];
+                        }
+                    }
+                }
+            }
+            
+            return augmented.map(row => row.slice(n));
+        };
+
+        const solveLinearSystem = (A, b) => {
+            try {
+                const AInv = invertMatrix(A);
+                return AInv.map(row => row.reduce((sum, val, i) => sum + val * b[i], 0));
+            } catch (error) {
+                console.error('Cannot solve linear system:', error);
+                return null;
+            }
+        };
+
+        // Regression Page - Multivariate Linear Models (using FastAPI backend)
+        const RegressionPage = ({ data, questions }) => {
+            const [regressionStats, setRegressionStats] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                const fetchRegression = async () => {
+                    if (data.length < 6) {
+                        console.log('Not enough data for regression:', data.length);
+                        setLoading(false);
+                        return;
+                    }
+
+                    console.log('Fetching regression analysis from backend...');
+                    setLoading(true);
+                    setError(null);
+
+                    try {
+                        const response = await fetch(`${API_BASE}/regression`);
+                        
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch regression analysis');
+                        }
+                        
+                        const results = await response.json();
+                        console.log('Received regression results:', results.length, 'models');
+                        setRegressionStats(results);
+                    } catch (err) {
+                        console.error('Error fetching regression:', err);
+                        setError(err.message);
+                        setRegressionStats([]);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                fetchRegression();
+            }, [data]);
+
+            if (data.length < 6) {
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-6">
+                        <div className="bg-green-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-green-700">
+                            <p className="text-green-300 text-center py-8">Need at least 6 responses for regression analysis</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    <div className="bg-green-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-green-700">
+                        <h2 className="text-3xl font-bold text-green-100 mb-2">Multivariate Regression Analysis</h2>
+                        <p className="text-green-300 text-sm mb-6">Ridge regression models predicting each question from the other five features (with regularization to handle multicollinearity)</p>
+
+                        {!regressionStats && (
+                            <div className="text-center py-8">
+                                <p className="text-green-300">Calculating regression models...</p>
+                            </div>
+                        )}
+
+                        {regressionStats && regressionStats.length === 0 && (
+                            <div className="text-center py-8">
+                                <p className="text-red-300">Unable to calculate any regression models. This may happen with insufficient data variation.</p>
+                                <p className="text-red-200 text-xs mt-2">Check browser console for details.</p>
+                            </div>
+                        )}
+
+                        {regressionStats && regressionStats.length > 0 && regressionStats.length < 6 && (
+                            <div className="bg-yellow-900 bg-opacity-30 rounded-lg p-4 mb-4 border border-yellow-600">
+                                <p className="text-yellow-200 text-sm">
+                                    Note: Only {regressionStats.length} of 6 models calculated successfully. 
+                                    Some models failed due to multicollinearity or insufficient data variation.
+                                </p>
+                            </div>
+                        )}
+
+                        {regressionStats && regressionStats.length > 0 && regressionStats.map((stat, idx) => (
+                            <div key={idx} className="mb-6 bg-green-800 bg-opacity-30 rounded-lg p-5 border border-green-600">
+                                <h3 className="text-lg font-bold text-green-100 mb-3">
+                                    Model {idx + 1}: Predicting Q{stat.targetIdx + 1}
+                                </h3>
+                                <p className="text-xs text-green-300 mb-4 italic">{stat.targetQuestion}</p>
+                                
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                    <div className="bg-green-700 bg-opacity-40 rounded p-3">
+                                        <p className="text-xs text-green-300">Adj R²</p>
+                                        <p className="text-xl font-bold text-green-100">{stat.adjR2.toFixed(4)}</p>
+                                    </div>
+                                    <div className="bg-green-700 bg-opacity-40 rounded p-3">
+                                        <p className="text-xs text-green-300">R²</p>
+                                        <p className="text-xl font-bold text-green-100">{stat.r2.toFixed(4)}</p>
+                                    </div>
+                                    <div className="bg-green-700 bg-opacity-40 rounded p-3">
+                                        <p className="text-xs text-green-300">RMSE</p>
+                                        <p className="text-xl font-bold text-green-100">{stat.rmse.toFixed(4)}</p>
+                                    </div>
+                                    <div className="bg-green-700 bg-opacity-40 rounded p-3">
+                                        <p className="text-xs text-green-300">n</p>
+                                        <p className="text-xl font-bold text-green-100">{stat.n}</p>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-green-800 bg-opacity-50">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-green-200">Predictor</th>
+                                                <th className="px-3 py-2 text-right text-green-200">Beta (β)</th>
+                                                <th className="px-3 py-2 text-right text-green-200">Std Error</th>
+                                                <th className="px-3 py-2 text-right text-green-200">t-statistic</th>
+                                                <th className="px-3 py-2 text-right text-green-200">P-value</th>
+                                                <th className="px-3 py-2 text-center text-green-200">Sig.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="text-green-100">
+                                            <tr className="border-t border-green-700">
+                                                <td className="px-3 py-2 font-mono">(Intercept)</td>
+                                                <td className="px-3 py-2 text-right font-mono">{stat.beta[0].toFixed(4)}</td>
+                                                <td className="px-3 py-2 text-right font-mono">{stat.standardErrors[0].toFixed(4)}</td>
+                                                <td className="px-3 py-2 text-right font-mono">{stat.tStats[0].toFixed(3)}</td>
+                                                <td className="px-3 py-2 text-right font-mono">{'<' + stat.pValues[0].toFixed(2)}</td>
+                                                <td className="px-3 py-2 text-center">{stat.pValues[0] < 0.05 ? '*' : ''}</td>
+                                            </tr>
+                                            {stat.predictorIndices.map((pIdx, i) => (
+                                                <tr key={pIdx} className="border-t border-green-700">
+                                                    <td className="px-3 py-2 font-semibold">Q{pIdx + 1}</td>
+                                                    <td className="px-3 py-2 text-right font-mono">{stat.beta[i + 1].toFixed(4)}</td>
+                                                    <td className="px-3 py-2 text-right font-mono">{stat.standardErrors[i + 1].toFixed(4)}</td>
+                                                    <td className="px-3 py-2 text-right font-mono">{stat.tStats[i + 1].toFixed(3)}</td>
+                                                    <td className="px-3 py-2 text-right font-mono">{'<' + stat.pValues[i + 1].toFixed(2)}</td>
+                                                    <td className="px-3 py-2 text-center font-bold">{stat.pValues[i + 1] < 0.05 ? '**' : stat.pValues[i + 1] < 0.10 ? '*' : ''}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p className="text-xs text-green-400 mt-2">* p &lt; 0.10, ** p &lt; 0.05</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Advanced Analytics Component
+        const AdvancedAnalytics = ({ data, questions }) => {
+            const [stats, setStats] = useState(null);
+            const covChartRef = useRef(null);
+            const pcaChartRef = useRef(null);
+            const scatterChartRef = useRef(null);
+            const boxplotChartRef = useRef(null);
+
+            useEffect(() => {
+                if (data.length < 2) return;
+
+                // Calculate statistics
+                const matrix = questions.map((_, i) => data.map(d => d[`q${i + 1}`]));
+                
+                // Means
+                const means = matrix.map(col => col.reduce((a, b) => a + b, 0) / col.length);
+                
+                // Correlation Matrix
+                const correlation = matrix.map((row1, i) => 
+                    matrix.map((row2, j) => {
+                        const mean1 = means[i];
+                        const mean2 = means[j];
+                        const n = row1.length;
+                        let numerator = 0, denom1 = 0, denom2 = 0;
+                        for (let k = 0; k < n; k++) {
+                            const diff1 = row1[k] - mean1;
+                            const diff2 = row2[k] - mean2;
+                            numerator += diff1 * diff2;
+                            denom1 += diff1 * diff1;
+                            denom2 += diff2 * diff2;
+                        }
+                        return numerator / Math.sqrt(denom1 * denom2) || 0;
+                    })
+                );
+
+                // Covariance Matrix
+                const covariance = matrix.map((row1, i) => 
+                    matrix.map((row2, j) => {
+                        const mean1 = means[i];
+                        const mean2 = means[j];
+                        return row1.reduce((sum, val, k) => sum + (val - mean1) * (row2[k] - mean2), 0) / (row1.length - 1);
+                    })
+                );
+
+                // Standard deviations
+                const stdDevs = matrix.map((col, i) => {
+                    const variance = col.reduce((sum, v) => sum + Math.pow(v - means[i], 2), 0) / (col.length - 1);
+                    return Math.sqrt(variance);
+                });
+
+                // Simple PCA (first 2 components)
+                // Center data
+                const centered = matrix.map((col, i) => col.map(v => v - means[i]));
+                
+                setStats({ correlation, covariance, means, stdDevs, centered });
+
+                // Create variance bar chart (more interpretable than covariance matrix)
+                if (covChartRef.current) covChartRef.current.destroy();
+                const covCanvas = document.getElementById('covariance-chart');
+                if (covCanvas) {
+                    covChartRef.current = new Chart(covCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: questions.map((_, i) => `Q${i+1}`),
+                            datasets: [{
+                                label: 'Variance',
+                                data: stdDevs.map(sd => sd * sd),
+                                backgroundColor: 'rgba(167, 139, 250, 0.7)',
+                                borderColor: 'rgba(167, 139, 250, 1)',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: true, text: 'Variance by Question', color: '#a78bfa', font: { size: 16, weight: 'bold' } }
+                            },
+                            scales: {
+                                x: { ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(167, 139, 250, 0.2)' } },
+                                y: { 
+                                    title: { display: true, text: 'Variance (σ²)', color: '#c4b5fd' },
+                                    ticks: { color: '#c4b5fd' }, 
+                                    grid: { color: 'rgba(167, 139, 250, 0.2)' },
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // PCA scatter plot (simplified - first 2 PCs)
+                if (pcaChartRef.current) pcaChartRef.current.destroy();
+                const pcaCanvas = document.getElementById('pca-chart');
+                if (pcaCanvas && data.length > 2) {
+                    const pcaData = data.map((d, i) => ({
+                        x: centered[0][i] + centered[1][i],
+                        y: centered[2][i] + centered[3][i]
+                    }));
+
+                    pcaChartRef.current = new Chart(pcaCanvas, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [{
+                                label: 'PCA Projection',
+                                data: pcaData,
+                                backgroundColor: 'rgba(251, 191, 36, 0.7)',
+                                borderColor: 'rgba(251, 191, 36, 1)',
+                                pointRadius: 8,
+                                pointHoverRadius: 10
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, labels: { color: '#c4b5fd' } },
+                                title: { display: true, text: 'PCA: First 2 Components (Simplified)', color: '#fbbf24', font: { size: 16, weight: 'bold' } }
+                            },
+                            scales: {
+                                x: { title: { display: true, text: 'PC1 (Q1+Q2)', color: '#c4b5fd' }, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(251, 191, 36, 0.2)' } },
+                                y: { title: { display: true, text: 'PC2 (Q3+Q4)', color: '#c4b5fd' }, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(251, 191, 36, 0.2)' } }
+                            }
+                        }
+                    });
+                }
+
+                // Q1 vs Q6 Scatter (most philosophically interesting comparison)
+                if (scatterChartRef.current) scatterChartRef.current.destroy();
+                const scatterCanvas = document.getElementById('scatter-chart');
+                if (scatterCanvas) {
+                    const scatterData = data.map(d => ({ x: d.q1, y: d.q6 }));
+                    scatterChartRef.current = new Chart(scatterCanvas, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [{
+                                label: 'Q1 vs Q6',
+                                data: scatterData,
+                                backgroundColor: 'rgba(34, 211, 238, 0.7)',
+                                borderColor: 'rgba(34, 211, 238, 1)',
+                                pointRadius: 6,
+                                pointHoverRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: true, text: 'Sentient AI Access vs Social Impact', color: '#22d3ee', font: { size: 16, weight: 'bold' } }
+                            },
+                            scales: {
+                                x: { title: { display: true, text: 'Q1: Sentient AI Access', color: '#c4b5fd' }, min: -1, max: 1, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } },
+                                y: { title: { display: true, text: 'Q6: Positive Social Impact', color: '#c4b5fd' }, min: -1, max: 1, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } }
+                            }
+                        }
+                    });
+                }
+
+                // Response timeline (mean response by chronological order)
+                if (boxplotChartRef.current) boxplotChartRef.current.destroy();
+                const boxplotCanvas = document.getElementById('boxplot-chart');
+                if (boxplotCanvas) {
+                    const overallMeans = data.map((d, idx) => {
+                        const sum = questions.reduce((acc, _, qIdx) => acc + d[`q${qIdx + 1}`], 0);
+                        return { x: idx + 1, y: sum / questions.length };
+                    });
+
+                    boxplotChartRef.current = new Chart(boxplotCanvas, {
+                        type: 'line',
+                        data: {
+                            datasets: [{
+                                label: 'Mean Response',
+                                data: overallMeans,
+                                borderColor: 'rgba(34, 211, 238, 1)',
+                                backgroundColor: 'rgba(34, 211, 238, 0.2)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 4,
+                                pointHoverRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: true, text: 'Overall Confidence Trend Over Time', color: '#22d3ee', font: { size: 16, weight: 'bold' } }
+                            },
+                            scales: {
+                                x: { title: { display: true, text: 'Response Number', color: '#c4b5fd' }, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } },
+                                y: { title: { display: true, text: 'Mean Confidence', color: '#c4b5fd' }, min: -1, max: 1, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } }
+                            }
+                        }
+                    });
+                }
+
+                return () => {
+                    if (covChartRef.current) covChartRef.current.destroy();
+                    if (pcaChartRef.current) pcaChartRef.current.destroy();
+                    if (scatterChartRef.current) scatterChartRef.current.destroy();
+                    if (boxplotChartRef.current) boxplotChartRef.current.destroy();
+                };
+            }, [data, questions]);
+
+            if (data.length < 2) {
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-6">
+                        <div className="bg-gradient-to-br from-cyan-900 to-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-cyan-700">
+                            <p className="text-cyan-300 text-center py-8">Need at least 2 responses for statistical analysis</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    <div className="bg-gradient-to-br from-cyan-900 to-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-cyan-700">
+                        <h2 className="text-3xl font-bold text-cyan-100 mb-2">Advanced Statistical Analysis</h2>
+                        <p className="text-cyan-300 text-sm mb-6">Multivariate correlation, variance, and dimensional analysis</p>
+
+                        {/* Correlation Grid */}
+                        {stats && (
+                            <div className="mb-6 bg-cyan-900 bg-opacity-30 rounded-lg p-4 border border-cyan-700">
+                                <h3 className="text-lg font-bold text-cyan-100 mb-3">Correlation Matrix (Pearson r)</h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="border-b border-cyan-700">
+                                                <th className="p-2 text-cyan-300"></th>
+                                                {questions.map((_, i) => (<th key={i} className="p-2 text-cyan-300">Q{i+1}</th>))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stats.correlation.map((row, i) => (
+                                                <tr key={i} className="border-b border-cyan-800">
+                                                    <td className="p-2 font-bold text-cyan-300">Q{i+1}</td>
+                                                    {row.map((val, j) => {
+                                                        const color = val > 0.7 ? 'bg-green-600' : val > 0.4 ? 'bg-yellow-600' : val < -0.4 ? 'bg-red-600' : 'bg-gray-700';
+                                                        return (
+                                                            <td key={j} className={`p-2 text-center matrix-cell ${color} text-white font-mono`}>
+                                                                {val.toFixed(2)}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            {/* Variance Chart */}
+                            <div className="bg-purple-900 bg-opacity-30 rounded-lg p-4 border border-purple-700">
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="covariance-chart"></canvas>
+                                </div>
+                            </div>
+
+                            {/* Response Trend */}
+                            <div className="bg-cyan-900 bg-opacity-30 rounded-lg p-4 border border-cyan-700">
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="boxplot-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            {/* PCA */}
+                            <div className="bg-yellow-900 bg-opacity-30 rounded-lg p-4 border border-yellow-700">
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="pca-chart"></canvas>
+                                </div>
+                            </div>
+
+                            {/* Q1 vs Q6 Scatter */}
+                            <div className="bg-cyan-900 bg-opacity-30 rounded-lg p-4 border border-cyan-700">
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="scatter-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Covariance Matrix */}
+                        {stats && (
+                            <div className="mb-6 bg-purple-900 bg-opacity-30 rounded-lg p-4 border border-purple-700">
+                                <h3 className="text-lg font-bold text-purple-100 mb-3">Covariance Matrix</h3>
+                                <p className="text-xs text-purple-300 mb-3">Shows how variables change together. Diagonal values are variances (σ²). Color intensity represents magnitude.</p>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="border-b border-purple-700">
+                                                <th className="p-2 text-purple-300"></th>
+                                                {questions.map((_, i) => (<th key={i} className="p-2 text-purple-300">Q{i+1}</th>))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stats.covariance.map((row, i) => (
+                                                <tr key={i} className="border-b border-purple-800">
+                                                    <td className="p-2 font-bold text-purple-300">Q{i+1}</td>
+                                                    {row.map((val, j) => {
+                                                        // Display actual covariance values
+                                                        const absVal = Math.abs(val);
+                                                        // Find max covariance for scaling
+                                                        const maxCov = Math.max(...stats.covariance.flat().map(v => Math.abs(v)));
+                                                        const intensity = Math.min(absVal / maxCov, 1);
+                                                        const isPositive = val >= 0;
+                                                        
+                                                        // Color based on sign and intensity
+                                                        let bgColor;
+                                                        if (i === j) {
+                                                            // Diagonal (variance) - use blue
+                                                            bgColor = `rgba(139, 92, 246, ${0.3 + intensity * 0.7})`;
+                                                        } else if (isPositive) {
+                                                            // Positive covariance - green
+                                                            bgColor = `rgba(34, 197, 94, ${0.2 + intensity * 0.8})`;
+                                                        } else {
+                                                            // Negative covariance - red
+                                                            bgColor = `rgba(239, 68, 68, ${0.2 + intensity * 0.8})`;
+                                                        }
+                                                        
+                                                        return (
+                                                            <td key={j} className="p-2 text-center matrix-cell text-white font-mono" style={{backgroundColor: bgColor}}>
+                                                                {val.toFixed(3)}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p className="text-xs text-purple-400 mt-2">Diagonal: Variance (σ²) | Green: Positive covariance | Red: Negative covariance | Intensity: Magnitude</p>
+                            </div>
+                        )}
+
+                        <div className="mt-6 text-xs text-cyan-400 space-y-1">
+                            <p>• <strong>Correlation (Pearson r):</strong> Measures linear relationship strength between questions (-1 to 1)</p>
+                            <p>• <strong>Variance:</strong> Measures spread/dispersion of responses for each question</p>
+                            <p>• <strong>Covariance:</strong> Raw covariance values showing how variables change together (unbounded)</p>
+                            <p>• <strong>PCA:</strong> Principal Component Analysis for dimensional reduction</p>
+                            <p>• <strong>Trend Analysis:</strong> Shows overall confidence evolution over time</p>
+                            <p>• <strong>Sample Size:</strong> n = {data.length} responses</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the app
+        try {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        } catch (error) {
+            console.error('Failed to render app:', error);
+            document.getElementById('root').innerHTML = `
+                <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(to bottom right, #581c87, #312e81); color: white; font-family: sans-serif; padding: 20px;">
+                    <div style="text-align: center; max-width: 600px;">
+                        <h1>Error Loading Survey</h1>
+                        <p style="color: #fbbf24;">Error: ${error.message}</p>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

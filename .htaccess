@@ -1,0 +1,24 @@
+# Passenger configuration for cPanel
+PassengerEnabled On
+PassengerAppRoot /home/username/public_html/SurveyAIUIUC
+PassengerBaseURI /SurveyAIUIUC
+PassengerPython /home/username/virtualenv/SurveyAIUIUC/3.9/bin/python3
+PassengerAppType wsgi
+PassengerStartupFile passenger_wsgi.py
+
+# Allow serving static files
+<FilesMatch "\.(html|css|js|json)$">
+    Allow from all
+</FilesMatch>
+
+# Rewrite rules
+RewriteEngine On
+RewriteBase /SurveyAIUIUC
+
+# Don't rewrite files or directories that exist
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Rewrite everything else to passenger_wsgi.py
+RewriteRule ^(.*)$ passenger_wsgi.py/$1 [QSA,L]
+

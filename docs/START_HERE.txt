@@ -1,0 +1,123 @@
+====================================================================
+  AI CONFIDENCE SURVEY - DEPLOYMENT PACKAGE
+  UIUC MS Business Analytics
+====================================================================
+
+📦 READY TO DEPLOY TO: glowstone.red/SurveyAIUIUC
+
+====================================================================
+  STEP 1: UPLOAD FILES
+====================================================================
+
+Via cPanel File Manager:
+1. Login to your NameCheap cPanel
+2. Open File Manager
+3. Navigate to public_html/
+4. Create folder: SurveyAIUIUC
+5. Upload ALL files from this folder
+
+Or via FTP:
+- Host: ftp.glowstone.red
+- Upload entire SurveyAIUIUC folder to public_html/
+
+====================================================================
+  STEP 2: FOLLOW THE GUIDE
+====================================================================
+
+👉 READ: QUICK_START_CPANEL.md
+   (5-minute deployment guide)
+
+Full documentation: CPANEL_DEPLOYMENT.md
+
+====================================================================
+  WHAT'S INCLUDED
+====================================================================
+
+✓ main.py                  - FastAPI backend with regression
+✓ passenger_wsgi.py        - cPanel/Passenger entry point
+✓ .htaccess               - Apache configuration
+✓ requirements.txt         - Python dependencies
+✓ index.html              - Main survey interface
+✓ 84Metashosan.html       - Admin panel
+✓ survey-data.json        - Your 107 existing responses
+
+✓ QUICK_START_CPANEL.md   - 5-minute guide
+✓ CPANEL_DEPLOYMENT.md    - Full cPanel guide
+✓ DEPLOYMENT.md           - VPS/SSH guide
+✓ README.md               - Documentation
+
+====================================================================
+  AFTER DEPLOYMENT
+====================================================================
+
+Access your survey at:
+→ https://glowstone.red/SurveyAIUIUC
+
+Admin panel at:
+→ https://glowstone.red/SurveyAIUIUC/admin
+   Default password: "password" (CHANGE THIS!)
+
+API endpoints:
+→ https://glowstone.red/SurveyAIUIUC/api/responses
+→ https://glowstone.red/SurveyAIUIUC/api/regression
+
+====================================================================
+  IMPORTANT: CHANGE ADMIN PASSWORD
+====================================================================
+
+1. Generate password hash:
+   Python: hashlib.sha256(b"YourPassword").hexdigest()
+
+2. Edit main.py line 22:
+   ADMIN_PASSWORD_HASH = "your_hash_here"
+
+3. Restart app in cPanel Python App Manager
+
+====================================================================
+  FEATURES
+====================================================================
+
+✅ Survey with 6 AI confidence questions
+✅ Real-time histograms with mean indicators
+✅ Python-powered multivariate regression (OLS/Ridge)
+✅ Advanced analytics (correlation, covariance, PCA)
+✅ Admin dashboard with data export
+✅ Sample data generation
+✅ Responsive mobile-friendly design
+
+====================================================================
+  TROUBLESHOOTING
+====================================================================
+
+App not loading?
+→ Check cPanel Error Log
+→ Verify Python version is 3.8+
+→ Check .htaccess has correct username
+
+500 Error?
+→ Check file permissions (644 for files, 755 for dirs)
+→ Verify dependencies installed
+→ Check survey-data.json is writable (666)
+
+Need help?
+→ See CPANEL_DEPLOYMENT.md
+→ Contact NameCheap support for Python app setup
+
+====================================================================
+  TECH STACK
+====================================================================
+
+Backend:  FastAPI (Python)
+Stats:    statsmodels, scikit-learn, pandas, numpy
+Frontend: React 18, Chart.js, Tailwind CSS
+Server:   Passenger (cPanel)
+Data:     JSON file storage
+
+====================================================================
+
+Questions? Check the documentation files in this folder.
+
+Good luck with your deployment! 🚀
+
+====================================================================
+

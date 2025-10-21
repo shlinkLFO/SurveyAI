@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - AI Confidence Survey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen">
+    <div id="app"></div>
+
+    <script>
+        const API_BASE = '/api';
+        let authenticated = false;
+        let adminPassword = '';
+
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (!authenticated) {
+                app.innerHTML = renderLoginForm();
+            } else {
+                app.innerHTML = renderAdminPanel();
+            }
+        }
+
+        function renderLoginForm() {
+            return `
+                <div class="min-h-screen flex items-center justify-center px-4">
+                    <div class="bg-gray-800 p-8 rounded-lg shadow-2xl border border-gray-700 max-w-md w-full">
+                        <h1 class="text-2xl font-bold text-white mb-6">Admin Authentication</h1>
+                        
+                        <form onsubmit="handleLogin(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+                                <input 
+                                    type="password" 
+                                    id="password" 
+                                    class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    required
+                                />
+                            </div>
+                            
+                            <button 
+                                type="submit"
+                                class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
+                            >
+                                Login
+                            </button>
+                        </form>
+                        
+                        <div id="login-error" class="mt-4 text-red-400 text-sm hidden"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAdminPanel() {
+            return `
+                <div class="max-w-6xl mx-auto px-4 py-8">
+                    <div class="bg-gray-800 rounded-lg shadow-2xl border border-gray-700 p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-3xl font-bold text-white">Admin Dashboard</h1>
+                            <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                                Logout
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                            <div class="bg-gray-700 p-6 rounded-lg">
+                                <h3 class="text-gray-400 text-sm mb-2">Total Responses</h3>
+                                <p id="total-count" class="text-3xl font-bold text-white">-</p>
+                            </div>
+                            <div class="bg-gray-700 p-6 rounded-lg">
+                                <h3 class="text-gray-400 text-sm mb-2">Latest Response</h3>
+                                <p id="latest-response" class="text-lg text-white">-</p>
+                            </div>
+                            <div class="bg-gray-700 p-6 rounded-lg">
+                                <h3 class="text-gray-400 text-sm mb-2">Database Status</h3>
+                                <p class="text-lg text-green-400">Active</p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-4 mb-6">
+                            <button 
+                                onclick="exportAllData()" 
+                                class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+                            >
+                                Export All Data (CSV)
+                            </button>
+                            <button 
+                                onclick="refreshData()" 
+                                class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                            >
+                                Refresh Data
+                            </button>
+                            <button 
+                                onclick="showGenerateModal()" 
+                                class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition"
+                            >
+                                Generate Sample Responses
+                            </button>
+                            <button 
+                                onclick="clearAllData()" 
+                                class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition"
+                            >
+                                Clear All Data
+                            </button>
+                        </div>
+
+                        <!-- Generate Sample Responses Modal -->
+                        <div id="generateModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-700">
+                                <h3 class="text-xl font-bold text-white mb-4">Generate Random Sample Responses</h3>
+                                <p class="text-gray-300 text-sm mb-4">This will create N randomly generated survey responses with realistic distributions.</p>
+                                
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Number of Responses (N)</label>
+                                    <input 
+                                        type="number" 
+                                        id="numResponses" 
+                                        min="1" 
+                                        max="1000" 
+                                        value="10"
+                                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                    />
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Distribution Type</label>
+                                    <select 
+                                        id="distributionType"
+                                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                    >
+                                        <option value="normal">Normal (Bell Curve)</option>
+                                        <option value="uniform">Uniform (Random)</option>
+                                        <option value="bimodal">Bimodal (Two Peaks)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="flex gap-3">
+                                    <button 
+                                        onclick="generateSampleResponses()" 
+                                        class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition"
+                                    >
+                                        Generate
+                                    </button>
+                                    <button 
+                                        onclick="hideGenerateModal()" 
+                                        class="flex-1 bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700 transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="data-preview" class="bg-gray-700 rounded-lg p-6">
+                            <h2 class="text-xl font-bold text-white mb-4">Recent Responses (Last 10)</h2>
+                            <div id="data-table" class="overflow-x-auto">
+                                <p class="text-gray-400">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('login-error');
+
+            try {
+                // Test authentication by trying to export data
+                const response = await fetch(`${API_BASE}/admin/export`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password })
+                });
+
+                if (response.ok) {
+                    authenticated = true;
+                    adminPassword = password;
+                    render();
+                    loadDashboardData();
+                } else {
+                    errorDiv.textContent = 'Invalid password';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Is the server running?';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            authenticated = false;
+            adminPassword = '';
+            render();
+        }
+
+        async function loadDashboardData() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/export`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: adminPassword })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    updateDashboard(data);
+                }
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            }
+        }
+
+        function updateDashboard(data) {
+            document.getElementById('total-count').textContent = data.length;
+            
+            if (data.length > 0) {
+                const latest = new Date(data[data.length - 1].timestamp);
+                document.getElementById('latest-response').textContent = latest.toLocaleString();
+                renderDataTable(data.slice(-10).reverse());
+            } else {
+                document.getElementById('latest-response').textContent = 'No data';
+                document.getElementById('data-table').innerHTML = '<p class="text-gray-400">No responses yet</p>';
+            }
+        }
+
+        function renderDataTable(data) {
+            const questions = [
+                "Q1: Sentient AI access",
+                "Q2: EQ by 2030",
+                "Q3: Job market without AI",
+                "Q4: Education hardships",
+                "Q5: ML understanding",
+                "Q6: Social impact by 2035"
+            ];
+
+            const html = `
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-800">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-gray-300">Timestamp</th>
+                            ${questions.map(q => `<th class="px-3 py-2 text-left text-gray-300">${q}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-200">
+                        ${data.map(entry => `
+                            <tr class="border-t border-gray-600">
+                                <td class="px-3 py-2">${new Date(entry.timestamp).toLocaleString()}</td>
+                                ${questions.map((_, idx) => `<td class="px-3 py-2">${entry[`q${idx + 1}`]?.toFixed(2) || 'N/A'}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            document.getElementById('data-table').innerHTML = html;
+        }
+
+        async function exportAllData() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/export`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: adminPassword })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    const questions = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6'];
+                    const headers = ['Timestamp', ...questions];
+                    const csvContent = [
+                        headers.join(','),
+                        ...data.map(entry => 
+                            [entry.timestamp, ...questions.map((_, idx) => entry[`q${idx + 1}`])].join(',')
+                        )
+                    ].join('\\n');
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `survey_data_admin_${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    
+                    alert('Data exported successfully!');
+                }
+            } catch (error) {
+                alert('Failed to export data: ' + error.message);
+            }
+        }
+
+        function refreshData() {
+            loadDashboardData();
+            alert('Data refreshed!');
+        }
+
+        async function clearAllData() {
+            if (!confirm('Are you sure you want to DELETE ALL survey data? This cannot be undone!')) {
+                return;
+            }
+
+            if (!confirm('This will permanently delete ' + document.getElementById('total-count').textContent + ' responses. Are you absolutely sure?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/clear`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: adminPassword })
+                });
+
+                if (response.ok) {
+                    alert('All data has been cleared.');
+                    loadDashboardData();
+                } else {
+                    alert('Failed to clear data.');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function showGenerateModal() {
+            document.getElementById('generateModal').classList.remove('hidden');
+        }
+
+        function hideGenerateModal() {
+            document.getElementById('generateModal').classList.add('hidden');
+        }
+
+        // Random number generators
+        function randomNormal(mean = 0, stdDev = 0.3) {
+            // Box-Muller transform
+            let u1 = Math.random();
+            let u2 = Math.random();
+            let z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+            return Math.max(-1, Math.min(1, mean + z0 * stdDev));
+        }
+
+        function randomUniform() {
+            return Math.random() * 2 - 1;
+        }
+
+        function randomBimodal() {
+            // Two peaks at -0.5 and 0.5
+            const peak = Math.random() > 0.5 ? 0.5 : -0.5;
+            return Math.max(-1, Math.min(1, peak + randomNormal(0, 0.2)));
+        }
+
+        async function generateSampleResponses() {
+            const numResponses = parseInt(document.getElementById('numResponses').value);
+            const distributionType = document.getElementById('distributionType').value;
+
+            if (numResponses < 1 || numResponses > 1000) {
+                alert('Please enter a number between 1 and 1000');
+                return;
+            }
+
+            if (!confirm(`This will generate ${numResponses} random sample responses. Continue?`)) {
+                return;
+            }
+
+            hideGenerateModal();
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: adminPassword,
+                        num_responses: numResponses,
+                        distribution_type: distributionType
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Generation complete!\nGenerated: ${result.generated}\nTotal responses: ${result.total}`);
+                    loadDashboardData();
+                } else {
+                    alert('Failed to generate samples. Check authentication.');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Initialize
+        render();
+    </script>
+</body>
+</html>
+
