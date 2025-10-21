@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Confidence Survey - UIUC MS Business Analytics</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 8px;
+            border-radius: 4px;
+        }
+        input[type="range"]::-moz-range-track {
+            height: 8px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
+
+        // API configuration
+        const API_BASE = window.location.origin;
+
+        // Survey questions
+        const questions = [
+            "As of today, humans have access to sentient AI",
+            "AI will outperform humans on a standardized exam for Emotional Intelligence: EQ by 2030",
+            "I could compete in the job market without leveraging AI",
+            "A child born Fall 2025 will complete HS in Spring of 2044. Given the child attends your High School: The child will endure *less* hardships on the K-12 path aspiring access to higher education (UIUC) than I did",
+            "I understand how Machine Learning AI models make decisions",
+            "AI will have a net positive impact on your closest social circle/s in a decade in review by 2035"
+        ];
+
+        const App = () => {
+            const [currentPage, setCurrentPage] = useState('survey');
+            const [responses, setResponses] = useState(questions.map(() => 0));
+            const [allData, setAllData] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const [hasSubmitted, setHasSubmitted] = useState(false);
+
+            // Check if user has submitted in this session
+            useEffect(() => {
+                const submitted = sessionStorage.getItem('surveySubmitted');
+                if (submitted === 'true') {
+                    setHasSubmitted(true);
+                }
+            }, []);
+
+            // Load data from backend on mount (only if submitted)
+            useEffect(() => {
+                if (hasSubmitted) {
+                    fetchAllData();
+                }
+            }, [hasSubmitted]);
+
+            const fetchAllData = async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/api/responses`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setAllData(data);
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch data:', err);
+                    setError('Unable to load data from server');
+                }
+            };
+
+            const handleSliderChange = (index, value) => {
+                const newResponses = [...responses];
+                newResponses[index] = parseFloat(value);
+                setResponses(newResponses);
+            };
+
+            const handleSubmit = async () => {
+                setLoading(true);
+                setError(null);
+
+                const timestamp = new Date().toISOString();
+                const newEntry = {
+                    timestamp,
+                    ...responses.reduce((acc, val, idx) => {
+                        acc[`q${idx + 1}`] = val;
+                        return acc;
+                    }, {})
+                };
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/responses`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(newEntry)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        setResponses(questions.map(() => 0));
+                        
+                        // Mark as submitted in this session
+                        sessionStorage.setItem('surveySubmitted', 'true');
+                        setHasSubmitted(true);
+                        
+                        alert(`Response submitted successfully! Total responses: ${result.count}\n\nYou can now access the data visualizations in the other tabs.`);
+                        
+                        // Refresh data and switch to export view
+                        await fetchAllData();
+                        setCurrentPage('export');
+                    } else {
+                        throw new Error('Failed to submit response');
+                    }
+                } catch (err) {
+                    console.error('Error submitting response:', err);
+                    alert('Failed to submit response. Please try again.');
+                    setError('Failed to submit response');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const exportCSV = () => {
+                if (allData.length === 0) {
+                    alert('No data to export');
+                    return;
+                }
+                
+                const headers = ['Timestamp', ...questions.map((_, idx) => `Q${idx + 1}`)];
+                const csvContent = [
+                    headers.join(','),
+                    ...allData.map(entry => 
+                        [entry.timestamp, ...questions.map((_, idx) => entry[`q${idx + 1}`])].join(',')
+                    )
+                ].join('\n');
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `survey_data_${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950">
+                    {/* Navigation */}
+                    <nav className="bg-purple-950 shadow-lg border-b border-purple-800">
+                        <div className="max-w-md mx-auto px-4 py-3 flex justify-between text-sm">
+                            <button
+                                onClick={() => setCurrentPage('survey')}
+                                className={`px-3 py-2 rounded ${currentPage === 'survey' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:text-white'}`}
+                            >
+                                Survey
+                            </button>
+                            <button
+                                onClick={() => hasSubmitted ? setCurrentPage('export') : alert('Please complete the survey first to view data')}
+                                disabled={!hasSubmitted}
+                                className={`px-3 py-2 rounded ${currentPage === 'export' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}
+                            >
+                                Data {!hasSubmitted && '🔒'}
+                            </button>
+                            <button
+                                onClick={() => hasSubmitted ? setCurrentPage('heatmap') : alert('Please complete the survey first to view correlations')}
+                                disabled={!hasSubmitted}
+                                className={`px-3 py-2 rounded ${currentPage === 'heatmap' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}
+                            >
+                                Heatmap {!hasSubmitted && '🔒'}
+                            </button>
+                            <button
+                                onClick={() => hasSubmitted ? setCurrentPage('distributions') : alert('Please complete the survey first to view distributions')}
+                                disabled={!hasSubmitted}
+                                className={`px-3 py-2 rounded ${currentPage === 'distributions' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}
+                            >
+                                Distributions {!hasSubmitted && '🔒'}
+                            </button>
+                        </div>
+                    </nav>
+
+                    {/* Survey Page */}
+                    {currentPage === 'survey' && (
+                        <div className="max-w-md mx-auto px-4 py-6">
+                            <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                                <h1 className="text-2xl font-bold text-purple-100 mb-2">AI Confidence Survey</h1>
+                                <p className="text-sm text-purple-300 mb-6">UIUC MS Business Analytics Research</p>
+                                
+                                <p className="text-xs text-purple-400 mb-6 italic">
+                                    Rate your confidence: Left (-1) = No confidence, Right (+1) = Full confidence
+                                </p>
+
+                                {questions.map((question, idx) => (
+                                    <div key={idx} className="mb-8">
+                                        <p className="text-sm font-medium text-purple-100 mb-3">
+                                            {idx + 1}. {question}
+                                        </p>
+                                        
+                                        <div className="relative">
+                                            <input
+                                                type="range"
+                                                min="-1"
+                                                max="1"
+                                                step="0.01"
+                                                value={responses[idx]}
+                                                onChange={(e) => handleSliderChange(idx, e.target.value)}
+                                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                                style={{
+                                                    background: `linear-gradient(to right, #ef4444 0%, #fbbf24 50%, #10b981 100%)`
+                                                }}
+                                            />
+                                            <div className="flex justify-between text-xs text-purple-300 mt-1">
+                                                <span>-1.0</span>
+                                                <span className="font-semibold text-amber-400">{responses[idx].toFixed(2)}</span>
+                                                <span>+1.0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+
+                            <button
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Submitting...' : 'Submit Response'}
+                            </button>
+                                
+                                <p className="text-xs text-center text-purple-400 mt-4">
+                                    {allData.length} response{allData.length !== 1 ? 's' : ''} collected
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Export Page */}
+                    {currentPage === 'export' && (
+                        <div className="max-w-4xl mx-auto px-4 py-6">
+                            <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                                <h2 className="text-2xl font-bold text-purple-100 mb-4">Survey Dataset</h2>
+                                <p className="text-purple-300 text-sm mb-4">View all responses from the study. You can export this data for your analysis.</p>
+                                
+                            <div className="flex gap-4 mb-6">
+                                <button
+                                    onClick={exportCSV}
+                                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition shadow-lg"
+                                >
+                                    Download CSV
+                                </button>
+                            </div>
+
+                                <p className="text-purple-300 mb-4">Total Responses: {allData.length}</p>
+
+                                {allData.length > 0 && (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full text-sm">
+                                            <thead className="bg-purple-800 bg-opacity-50">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left text-purple-200">Timestamp</th>
+                                                    {questions.map((_, idx) => (
+                                                        <th key={idx} className="px-4 py-2 text-left text-purple-200">Q{idx + 1}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {allData.slice(-10).reverse().map((entry, idx) => (
+                                                    <tr key={idx} className="border-t border-purple-700">
+                                                        <td className="px-4 py-2 text-purple-200">{new Date(entry.timestamp).toLocaleString()}</td>
+                                                        {questions.map((_, qIdx) => (
+                                                            <td key={qIdx} className="px-4 py-2 text-purple-200">{entry[`q${qIdx + 1}`].toFixed(2)}</td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        {allData.length > 10 && (
+                                            <p className="text-xs text-purple-400 mt-2 text-center">Showing 10 most recent responses</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {allData.length === 0 && (
+                                    <p className="text-purple-400 text-center py-8">No data collected yet</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Heatmap Page */}
+                    {currentPage === 'heatmap' && hasSubmitted && (
+                        <div className="max-w-4xl mx-auto px-4 py-6">
+                            <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                                <h2 className="text-2xl font-bold text-purple-100 mb-4">Correlation Heatmap - OLS Regression</h2>
+                                <p className="text-purple-300 text-sm mb-4">Pearson correlation coefficients between survey questions (current as of your submission)</p>
+                                
+                                {allData.length > 1 ? (
+                                    <CorrelationHeatmap data={allData} questions={questions} />
+                                ) : (
+                                    <p className="text-purple-400 text-center py-8">Need at least 2 responses to show correlations</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Distributions Page */}
+                    {currentPage === 'distributions' && hasSubmitted && (
+                        <div className="max-w-6xl mx-auto px-4 py-6">
+                            <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                                <h2 className="text-2xl font-bold text-purple-100 mb-4">Response Distributions - Variance Analysis</h2>
+                                <p className="text-purple-300 text-sm mb-4">Statistical distribution for each survey question showing mean, variance, and standard deviation</p>
+                                
+                                {allData.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {questions.map((question, idx) => (
+                                            <DistributionChart key={idx} data={allData} questionIndex={idx} question={question} />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-purple-400 text-center py-8">No data to display</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Correlation Heatmap Component
+        const CorrelationHeatmap = ({ data, questions }) => {
+            const calculateCorrelation = (arr1, arr2) => {
+                const n = arr1.length;
+                const mean1 = arr1.reduce((a, b) => a + b, 0) / n;
+                const mean2 = arr2.reduce((a, b) => a + b, 0) / n;
+                
+                let numerator = 0;
+                let denom1 = 0;
+                let denom2 = 0;
+                
+                for (let i = 0; i < n; i++) {
+                    const diff1 = arr1[i] - mean1;
+                    const diff2 = arr2[i] - mean2;
+                    numerator += diff1 * diff2;
+                    denom1 += diff1 * diff1;
+                    denom2 += diff2 * diff2;
+                }
+                
+                return numerator / Math.sqrt(denom1 * denom2);
+            };
+
+            const correlationMatrix = questions.map((_, i) => {
+                return questions.map((_, j) => {
+                    const values1 = data.map(d => d[`q${i + 1}`]);
+                    const values2 = data.map(d => d[`q${j + 1}`]);
+                    return calculateCorrelation(values1, values2);
+                });
+            });
+
+            const getColor = (value) => {
+                if (value > 0) {
+                    const intensity = Math.floor(value * 255);
+                    return `rgb(${255 - intensity}, ${255 - intensity}, 255)`;
+                } else {
+                    const intensity = Math.floor(Math.abs(value) * 255);
+                    return `rgb(255, ${255 - intensity}, ${255 - intensity})`;
+                }
+            };
+
+            return (
+                <div className="overflow-x-auto">
+                    <table className="mx-auto text-xs">
+                        <thead>
+                            <tr>
+                                <th className="text-purple-200"></th>
+                                {questions.map((_, idx) => (
+                                    <th key={idx} className="px-2 py-1 text-purple-200">Q{idx + 1}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {correlationMatrix.map((row, i) => (
+                                <tr key={i}>
+                                    <td className="font-semibold px-2 py-1 text-purple-200">Q{i + 1}</td>
+                                    {row.map((value, j) => (
+                                        <td
+                                            key={j}
+                                            className="px-2 py-1 text-center border border-purple-700 text-purple-100"
+                                            style={{ backgroundColor: getColor(value) }}
+                                        >
+                                            {value.toFixed(2)}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    
+                    <div className="mt-6">
+                        <h3 className="font-semibold mb-2 text-purple-200">Questions:</h3>
+                        {questions.map((q, idx) => (
+                            <p key={idx} className="text-xs text-purple-300 mb-1">
+                                Q{idx + 1}: {q}
+                            </p>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Distribution Chart Component
+        const DistributionChart = ({ data, questionIndex, question }) => {
+            const values = data.map(d => d[`q${questionIndex + 1}`]);
+            
+            // Create bins
+            const bins = Array.from({ length: 20 }, (_, i) => {
+                const binStart = -1 + (i * 0.1);
+                const binEnd = binStart + 0.1;
+                const count = values.filter(v => v >= binStart && v < binEnd).length;
+                return {
+                    range: binStart.toFixed(1),
+                    count
+                };
+            });
+
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+
+            return (
+                <div className="border border-purple-700 rounded-lg p-4 bg-purple-800 bg-opacity-30">
+                    <h3 className="text-sm font-semibold mb-2 text-purple-100">Q{questionIndex + 1}: {question.substring(0, 50)}...</h3>
+                    <div className="text-xs text-purple-300 mb-2">
+                        Mean: {mean.toFixed(3)} | Variance: {variance.toFixed(3)} | Std Dev: {Math.sqrt(variance).toFixed(3)}
+                    </div>
+                    <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={bins}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#6b21a8" />
+                            <XAxis dataKey="range" tick={{ fontSize: 10, fill: '#c4b5fd' }} />
+                            <YAxis tick={{ fontSize: 10, fill: '#c4b5fd' }} />
+                            <Tooltip contentStyle={{ backgroundColor: '#581c87', border: '1px solid #7c3aed' }} />
+                            <Bar dataKey="count" fill="#a855f7" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            );
+        };
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
