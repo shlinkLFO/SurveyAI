@@ -120,12 +120,23 @@ app.post('/api/admin/export', async (req, res) => {
     }
 });
 
+// Serve index.html at root
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Serve admin page
+app.get('/84Metashosan', (req, res) => {
+    res.sendFile(path.join(__dirname, '84Metashosan.html'));
+});
+
 // Start server
 async function start() {
     await initDataFile();
     app.listen(PORT, () => {
         console.log(`Survey server running on port ${PORT}`);
         console.log(`Access the survey at: http://localhost:${PORT}`);
+        console.log(`Admin panel at: http://localhost:${PORT}/84Metashosan`);
     });
 }
 

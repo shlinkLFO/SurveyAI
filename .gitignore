@@ -8,11 +8,18 @@ yarn-error.log*
 *.log
 package-lock.json
 
-# Deployment files (local only)
-deploy_batch.sftp
-test-connection.bat
-Screenshot*.png
+# Deployment folders (local only)
+UPLOAD_TO_CPANEL/
+DEPLOY_TO_SERVER/
+FINAL_UPLOAD/
 
-# Documentation (optional - comment out if you want to include)
-# DEPLOYMENT*.md
-# TROUBLESHOOTING.md
+# Deployment scripts (local only)
+deploy*.php
+deploy*.sh
+deploy*.bat
+test-connection.bat
+*_htaccess.txt
+
+# Screenshots
+Screenshot*.png
+*.png

@@ -1,0 +1,47 @@
+==================================================
+  FILES TO UPLOAD TO NAMECHEAP CPANEL
+==================================================
+
+Upload Location: /home/shlinky/ServeyAILL6/
+(or public_html/ServeyAILL6/)
+
+Files in C:\Users\mason\SurveyAI\:
+
+1. index.html          (38 KB) - Main survey page
+2. 84Metashosan.html   (12 KB) - Admin panel  
+3. server.js           (4 KB)  - Backend server
+4. package.json        (1 KB)  - Dependencies
+5. .gitignore          (1 KB)  - Optional
+
+==================================================
+  QUICK STEPS
+==================================================
+
+1. cPanel Login:
+   https://glowstone.red:2083
+   Username: shlinky
+
+2. File Manager → Upload → Select all 5 files
+
+3. Setup Node.js App (in cPanel):
+   - Node version: 18.x
+   - App root: ServeyAILL6
+   - Startup file: server.js
+   - Click "Create"
+
+4. Run NPM Install (in Node.js App interface)
+
+5. Add Environment Variables:
+   ADMIN_PASSWORD = YourSecurePassword123
+   PORT = 3000
+
+6. Start App
+
+7. Access:
+   Survey: https://glowstone.red/SurveyAI/
+   Admin:  https://glowstone.red/SurveyAI/84Metashosan
+
+==================================================
+
+See NAMECHEAP_DEPLOY.md for detailed instructions!
+
