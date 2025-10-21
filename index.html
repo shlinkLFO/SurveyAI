@@ -66,14 +66,14 @@
         const { useState, useEffect, useRef } = React;
 
         // API configuration
-        const API_BASE = '/api';
+        const API_BASE = '/SurveyAIUIUC/api';
 
         // Survey questions
         const questions = [
             "As of today, humans have access to sentient AI",
             "AI will outperform humans on a standardized exam for Emotional Intelligence: EQ by 2030",
             "I could compete in the job market without leveraging AI",
-            "A child born Fall 2025 will complete HS in Spring of 2044. Given the child attends your High School: The child will endure *less* hardships on the K-12 path aspiring access to higher education (UIUC) than I did",
+            "A child born today will experience more competition / have a more difficult time to get to where I am today than I did: given they will graduate HS in Spring 2044.",
             "I understand how Machine Learning AI models make decisions",
             "AI will have a net positive impact on your closest social circle/s in a decade in review by 2035"
         ];
@@ -646,8 +646,7 @@
         const AdvancedAnalytics = ({ data, questions }) => {
             const [stats, setStats] = useState(null);
             const covChartRef = useRef(null);
-            const pcaChartRef = useRef(null);
-            const scatterChartRef = useRef(null);
+            const scatterChartRefs = useRef([]);
             const boxplotChartRef = useRef(null);
 
             useEffect(() => {
@@ -698,17 +697,21 @@
                 
                 setStats({ correlation, covariance, means, stdDevs, centered });
 
-                // Create variance bar chart (more interpretable than covariance matrix)
+                // Create variance bar chart - SORTED by greatest to least
                 if (covChartRef.current) covChartRef.current.destroy();
                 const covCanvas = document.getElementById('covariance-chart');
                 if (covCanvas) {
+                    const variances = stdDevs.map((sd, i) => ({ q: i, variance: sd * sd }));
+                    variances.sort((a, b) => b.variance - a.variance);
+                    const maxVariance = Math.max(...variances.map(v => v.variance));
+                    
                     covChartRef.current = new Chart(covCanvas, {
                         type: 'bar',
                         data: {
-                            labels: questions.map((_, i) => `Q${i+1}`),
+                            labels: variances.map(v => `Q${v.q+1}`),
                             datasets: [{
                                 label: 'Variance',
-                                data: stdDevs.map(sd => sd * sd),
+                                data: variances.map(v => v.variance),
                                 backgroundColor: 'rgba(167, 139, 250, 0.7)',
                                 borderColor: 'rgba(167, 139, 250, 1)',
                                 borderWidth: 2
@@ -719,7 +722,7 @@
                             maintainAspectRatio: false,
                             plugins: {
                                 legend: { display: false },
-                                title: { display: true, text: 'Variance by Question', color: '#a78bfa', font: { size: 16, weight: 'bold' } }
+                                title: { display: true, text: 'Variance by Question (Sorted)', color: '#a78bfa', font: { size: 16, weight: 'bold' } }
                             },
                             scales: {
                                 x: { ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(167, 139, 250, 0.2)' } },
@@ -727,64 +730,84 @@
                                     title: { display: true, text: 'Variance (σ²)', color: '#c4b5fd' },
                                     ticks: { color: '#c4b5fd' }, 
                                     grid: { color: 'rgba(167, 139, 250, 0.2)' },
-                                    beginAtZero: true
+                                    beginAtZero: true,
+                                    max: maxVariance * 1.1
                                 }
                             }
                         }
                     });
                 }
 
-                // PCA scatter plot (simplified - first 2 PCs)
-                if (pcaChartRef.current) pcaChartRef.current.destroy();
-                const pcaCanvas = document.getElementById('pca-chart');
-                if (pcaCanvas && data.length > 2) {
-                    const pcaData = data.map((d, i) => ({
-                        x: centered[0][i] + centered[1][i],
-                        y: centered[2][i] + centered[3][i]
-                    }));
-
-                    pcaChartRef.current = new Chart(pcaCanvas, {
-                        type: 'scatter',
-                        data: {
-                            datasets: [{
-                                label: 'PCA Projection',
-                                data: pcaData,
-                                backgroundColor: 'rgba(251, 191, 36, 0.7)',
-                                borderColor: 'rgba(251, 191, 36, 1)',
-                                pointRadius: 8,
-                                pointHoverRadius: 10
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: true, labels: { color: '#c4b5fd' } },
-                                title: { display: true, text: 'PCA: First 2 Components (Simplified)', color: '#fbbf24', font: { size: 16, weight: 'bold' } }
-                            },
-                            scales: {
-                                x: { title: { display: true, text: 'PC1 (Q1+Q2)', color: '#c4b5fd' }, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(251, 191, 36, 0.2)' } },
-                                y: { title: { display: true, text: 'PC2 (Q3+Q4)', color: '#c4b5fd' }, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(251, 191, 36, 0.2)' } }
-                            }
+                // Create Q vs Q scatter plots with regression lines - ALL 30 combinations
+                scatterChartRefs.current.forEach(chart => chart?.destroy());
+                scatterChartRefs.current = [];
+                
+                const questionLabels = [
+                    'Present day Sentience',
+                    'Superhuman EQ by 2030',
+                    'AI Reliance for Work',
+                    'Newborn vs You',
+                    'Self-reported Understanding',
+                    'Social Circles: +FX /Next10Y'
+                ];
+                
+                // Generate all pairs (each Q vs every other Q, excluding self)
+                const questionPairs = [];
+                for (let i = 0; i < 6; i++) {
+                    for (let j = 0; j < 6; j++) {
+                        if (i !== j) {
+                            questionPairs.push([i, j]);
                         }
-                    });
+                    }
                 }
-
-                // Q1 vs Q6 Scatter (most philosophically interesting comparison)
-                if (scatterChartRef.current) scatterChartRef.current.destroy();
-                const scatterCanvas = document.getElementById('scatter-chart');
-                if (scatterCanvas) {
-                    const scatterData = data.map(d => ({ x: d.q1, y: d.q6 }));
-                    scatterChartRef.current = new Chart(scatterCanvas, {
+                
+                questionPairs.forEach((pair, idx) => {
+                    const [qx, qy] = pair;
+                    const canvasId = `scatter-chart-${idx}`;
+                    const canvas = document.getElementById(canvasId);
+                    if (!canvas) return;
+                    
+                    const scatterData = data.map(d => ({ x: d[`q${qx+1}`], y: d[`q${qy+1}`] }));
+                    
+                    // Calculate linear regression
+                    const n = scatterData.length;
+                    const sumX = scatterData.reduce((s, p) => s + p.x, 0);
+                    const sumY = scatterData.reduce((s, p) => s + p.y, 0);
+                    const sumXY = scatterData.reduce((s, p) => s + p.x * p.y, 0);
+                    const sumX2 = scatterData.reduce((s, p) => s + p.x * p.x, 0);
+                    const sumY2 = scatterData.reduce((s, p) => s + p.y * p.y, 0);
+                    
+                    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                    const intercept = (sumY - slope * sumX) / n;
+                    
+                    const rNum = n * sumXY - sumX * sumY;
+                    const rDenom = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+                    const r = rNum / rDenom;
+                    const r2 = r * r;
+                    
+                    const cov = covariance[qx][qy];
+                    
+                    // Regression line data
+                    const regLine = [{ x: -1, y: slope * -1 + intercept }, { x: 1, y: slope * 1 + intercept }];
+                    
+                    scatterChartRefs.current[idx] = new Chart(canvas, {
                         type: 'scatter',
                         data: {
                             datasets: [{
-                                label: 'Q1 vs Q6',
+                                label: 'Data',
                                 data: scatterData,
-                                backgroundColor: 'rgba(34, 211, 238, 0.7)',
+                                backgroundColor: 'rgba(34, 211, 238, 0.6)',
                                 borderColor: 'rgba(34, 211, 238, 1)',
-                                pointRadius: 6,
-                                pointHoverRadius: 8
+                                pointRadius: 3,
+                                pointHoverRadius: 5
+                            }, {
+                                label: 'Best Fit',
+                                data: regLine,
+                                type: 'line',
+                                borderColor: 'rgba(251, 191, 36, 1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false
                             }]
                         },
                         options: {
@@ -792,31 +815,60 @@
                             maintainAspectRatio: false,
                             plugins: {
                                 legend: { display: false },
-                                title: { display: true, text: 'Sentient AI Access vs Social Impact', color: '#22d3ee', font: { size: 16, weight: 'bold' } }
+                                title: { 
+                                    display: true, 
+                                    text: `${questionLabels[qx]} → ${questionLabels[qy]} | R²=${r2.toFixed(2)} r=${r.toFixed(2)}`,
+                                    color: '#22d3ee', 
+                                    font: { size: 9, weight: 'bold' }
+                                }
                             },
                             scales: {
-                                x: { title: { display: true, text: 'Q1: Sentient AI Access', color: '#c4b5fd' }, min: -1, max: 1, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } },
-                                y: { title: { display: true, text: 'Q6: Positive Social Impact', color: '#c4b5fd' }, min: -1, max: 1, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } }
+                                x: { min: -1, max: 1, ticks: { color: '#c4b5fd', font: { size: 8 } }, grid: { color: 'rgba(34, 211, 238, 0.2)' } },
+                                y: { min: -1, max: 1, ticks: { color: '#c4b5fd', font: { size: 8 } }, grid: { color: 'rgba(34, 211, 238, 0.2)' } }
                             }
                         }
                     });
-                }
+                });
 
-                // Response timeline (mean response by chronological order)
+                // Response timeline - 12-hour windows
                 if (boxplotChartRef.current) boxplotChartRef.current.destroy();
                 const boxplotCanvas = document.getElementById('boxplot-chart');
                 if (boxplotCanvas) {
-                    const overallMeans = data.map((d, idx) => {
+                    // Parse timestamps and calculate 12-hour windows
+                    const timestamps = data.map(d => new Date(d.timestamp).getTime());
+                    const firstTime = Math.min(...timestamps);
+                    const lastTime = Math.max(...timestamps);
+                    const totalHours = (lastTime - firstTime) / (1000 * 60 * 60);
+                    
+                    // Determine window size: start with 12 hours, but adapt
+                    let numWindows = Math.max(2, Math.min(Math.ceil(totalHours / 12), 12));
+                    const windowSize = (lastTime - firstTime) / numWindows;
+                    
+                    // Group data by window
+                    const windows = Array(numWindows).fill(0).map((_, i) => ({
+                        start: firstTime + i * windowSize,
+                        end: firstTime + (i + 1) * windowSize,
+                        values: []
+                    }));
+                    
+                    data.forEach((d, idx) => {
+                        const t = timestamps[idx];
+                        const windowIdx = Math.min(Math.floor((t - firstTime) / windowSize), numWindows - 1);
                         const sum = questions.reduce((acc, _, qIdx) => acc + d[`q${qIdx + 1}`], 0);
-                        return { x: idx + 1, y: sum / questions.length };
+                        windows[windowIdx].values.push(sum / questions.length);
                     });
+                    
+                    const windowData = windows.map((w, i) => ({
+                        x: i + 1,
+                        y: w.values.length > 0 ? w.values.reduce((a, b) => a + b, 0) / w.values.length : null
+                    })).filter(d => d.y !== null);
 
                     boxplotChartRef.current = new Chart(boxplotCanvas, {
                         type: 'line',
                         data: {
                             datasets: [{
                                 label: 'Mean Response',
-                                data: overallMeans,
+                                data: windowData,
                                 borderColor: 'rgba(34, 211, 238, 1)',
                                 backgroundColor: 'rgba(34, 211, 238, 0.2)',
                                 borderWidth: 2,
@@ -834,7 +886,7 @@
                                 title: { display: true, text: 'Overall Confidence Trend Over Time', color: '#22d3ee', font: { size: 16, weight: 'bold' } }
                             },
                             scales: {
-                                x: { title: { display: true, text: 'Response Number', color: '#c4b5fd' }, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } },
+                                x: { title: { display: true, text: '12-Hour Windows', color: '#c4b5fd' }, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } },
                                 y: { title: { display: true, text: 'Mean Confidence', color: '#c4b5fd' }, min: -1, max: 1, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } }
                             }
                         }
@@ -843,8 +895,7 @@
 
                 return () => {
                     if (covChartRef.current) covChartRef.current.destroy();
-                    if (pcaChartRef.current) pcaChartRef.current.destroy();
-                    if (scatterChartRef.current) scatterChartRef.current.destroy();
+                    scatterChartRefs.current.forEach(chart => chart?.destroy());
                     if (boxplotChartRef.current) boxplotChartRef.current.destroy();
                 };
             }, [data, questions]);
@@ -882,9 +933,22 @@
                                                 <tr key={i} className="border-b border-cyan-800">
                                                     <td className="p-2 font-bold text-cyan-300">Q{i+1}</td>
                                                     {row.map((val, j) => {
-                                                        const color = val > 0.7 ? 'bg-green-600' : val > 0.4 ? 'bg-yellow-600' : val < -0.4 ? 'bg-red-600' : 'bg-gray-700';
+                                                        // Gradient: green(1.0) → grey-yellow(0.0) → red(-1.0)
+                                                        let bgColor;
+                                                        if (val > 0) {
+                                                            // Positive: grey-yellow to green
+                                                            const intensity = val;
+                                                            bgColor = `rgba(34, 197, 94, ${0.3 + intensity * 0.7})`;
+                                                        } else if (val < 0) {
+                                                            // Negative: grey-yellow to red
+                                                            const intensity = Math.abs(val);
+                                                            bgColor = `rgba(239, 68, 68, ${0.3 + intensity * 0.7})`;
+                                                        } else {
+                                                            // Zero: grey-yellow
+                                                            bgColor = 'rgba(161, 161, 170, 0.5)';
+                                                        }
                                                         return (
-                                                            <td key={j} className={`p-2 text-center matrix-cell ${color} text-white font-mono`}>
+                                                            <td key={j} className="p-2 text-center matrix-cell text-white font-mono" style={{backgroundColor: bgColor}}>
                                                                 {val.toFixed(2)}
                                                             </td>
                                                         );
@@ -894,6 +958,10 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                <p className="text-xs text-cyan-300 mt-2">
+                                    <strong>Pearson r:</strong> Measures the strength and direction of linear relationship between two variables. 
+                                    Values range from -1 (perfect negative correlation) through 0 (no correlation) to +1 (perfect positive correlation).
+                                </p>
                             </div>
                         )}
 
@@ -913,27 +981,21 @@
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            {/* PCA */}
-                            <div className="bg-yellow-900 bg-opacity-30 rounded-lg p-4 border border-yellow-700">
-                                <div style={{ height: '300px' }}>
-                                    <canvas id="pca-chart"></canvas>
+                        {/* Question vs Question Scatter Plots with Regression - All 30 combinations */}
+                        <div className="grid grid-cols-5 lg:grid-cols-6 gap-2 mb-6">
+                            {Array.from({ length: 30 }).map((_, i) => (
+                                <div key={i} className="bg-cyan-900 bg-opacity-30 rounded-lg p-1 border border-cyan-700">
+                                    <div style={{ height: '150px' }}>
+                                        <canvas id={`scatter-chart-${i}`}></canvas>
+                                    </div>
                                 </div>
-                            </div>
-
-                            {/* Q1 vs Q6 Scatter */}
-                            <div className="bg-cyan-900 bg-opacity-30 rounded-lg p-4 border border-cyan-700">
-                                <div style={{ height: '300px' }}>
-                                    <canvas id="scatter-chart"></canvas>
-                                </div>
-                            </div>
+                            ))}
                         </div>
 
                         {/* Covariance Matrix */}
                         {stats && (
                             <div className="mb-6 bg-purple-900 bg-opacity-30 rounded-lg p-4 border border-purple-700">
                                 <h3 className="text-lg font-bold text-purple-100 mb-3">Covariance Matrix</h3>
-                                <p className="text-xs text-purple-300 mb-3">Shows how variables change together. Diagonal values are variances (σ²). Color intensity represents magnitude.</p>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-xs">
                                         <thead>
@@ -978,17 +1040,18 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <p className="text-xs text-purple-400 mt-2">Diagonal: Variance (σ²) | Green: Positive covariance | Red: Negative covariance | Intensity: Magnitude</p>
+                                <p className="text-xs text-purple-300 mt-2">
+                                    <strong>Covariance:</strong> Shows how variables change together. Positive values indicate variables increase together, 
+                                    negative values indicate inverse relationship. Diagonal values are variances (σ²).
+                                </p>
+                                <p className="text-xs text-purple-400 mt-1">Diagonal: Variance (σ²) | Green: Positive covariance | Red: Negative covariance | Intensity: Magnitude</p>
                             </div>
                         )}
 
                         <div className="mt-6 text-xs text-cyan-400 space-y-1">
-                            <p>• <strong>Correlation (Pearson r):</strong> Measures linear relationship strength between questions (-1 to 1)</p>
-                            <p>• <strong>Variance:</strong> Measures spread/dispersion of responses for each question</p>
-                            <p>• <strong>Covariance:</strong> Raw covariance values showing how variables change together (unbounded)</p>
-                            <p>• <strong>PCA:</strong> Principal Component Analysis for dimensional reduction</p>
-                            <p>• <strong>Trend Analysis:</strong> Shows overall confidence evolution over time</p>
                             <p>• <strong>Sample Size:</strong> n = {data.length} responses</p>
+                            <p>• <strong>Trend Analysis:</strong> Shows overall confidence evolution over 12-hour time windows</p>
+                            <p>• <strong>Scatter Plots (30 total):</strong> Each question compared to every other question with linear regression line (R² = coefficient of determination, r = Pearson correlation)</p>
                         </div>
                     </div>
                 </div>

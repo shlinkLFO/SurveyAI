@@ -14,7 +14,9 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error
 import hashlib
 
-app = FastAPI(title="AI Confidence Survey - UIUC")
+app = FastAPI(
+    title="AI Confidence Survey - UIUC"
+)
 
 # CORS middleware
 app.add_middleware(

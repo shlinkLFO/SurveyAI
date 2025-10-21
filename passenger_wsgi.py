@@ -1,22 +1,20 @@
 """
 WSGI entry point for cPanel Passenger deployment
-This file is required for cPanel Python app hosting
+FastAPI is ASGI, so we need to wrap it for WSGI
 """
-
 import sys
 import os
 
-# Get the current directory
-INTERP = os.path.expanduser("~/virtualenv/SurveyAIUIUC/3.9/bin/python3")
-if sys.executable != INTERP:
-    os.execl(INTERP, INTERP, *sys.argv)
-
 # Add the app directory to path
-sys.path.insert(0, os.path.dirname(__file__))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
 
 # Import the FastAPI app
 from main import app
 
-# Passenger expects an 'application' object
-application = app
+# Use a2wsgi to wrap ASGI app for Passenger WSGI
+from a2wsgi import ASGIMiddleware
+
+# Passenger expects a WSGI 'application' object
+application = ASGIMiddleware(app)
 

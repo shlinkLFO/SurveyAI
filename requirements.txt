@@ -6,4 +6,5 @@ statsmodels==0.14.0
 scikit-learn==1.3.2
 pydantic==2.5.0
 python-multipart==0.0.6
+a2wsgi==1.10.0
 

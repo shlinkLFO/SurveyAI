@@ -1,24 +1,18 @@
-# Passenger configuration for cPanel
-PassengerEnabled On
-PassengerAppRoot /home/username/public_html/SurveyAIUIUC
-PassengerBaseURI /SurveyAIUIUC
-PassengerPython /home/username/virtualenv/SurveyAIUIUC/3.9/bin/python3
-PassengerAppType wsgi
-PassengerStartupFile passenger_wsgi.py
-
-# Allow serving static files
-<FilesMatch "\.(html|css|js|json)$">
-    Allow from all
-</FilesMatch>
-
-# Rewrite rules
+# Proxy to local uvicorn server
 RewriteEngine On
-RewriteBase /SurveyAIUIUC
 
-# Don't rewrite files or directories that exist
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+# Allow static files to be served directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
 
-# Rewrite everything else to passenger_wsgi.py
-RewriteRule ^(.*)$ passenger_wsgi.py/$1 [QSA,L]
+# Proxy API requests to uvicorn on port 8000
+RewriteCond %{REQUEST_URI} ^/SurveyAIUIUC/
+RewriteRule ^(.*)$ http://127.0.0.1:8000/$1 [P,L]
 
+# Enable proxy
+<IfModule mod_proxy.c>
+    ProxyPreserveHost On
+    ProxyPass /SurveyAIUIUC http://127.0.0.1:8000/SurveyAIUIUC
+    ProxyPassReverse /SurveyAIUIUC http://127.0.0.1:8000/SurveyAIUIUC
+</IfModule>
