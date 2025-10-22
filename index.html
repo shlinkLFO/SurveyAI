@@ -7,7 +7,8 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.33.0.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         input[type="range"] {
@@ -43,37 +44,135 @@
             height: 8px;
             border-radius: 4px;
         }
+        .matrix-cell {
+            transition: all 0.2s;
+        }
+        .matrix-cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+        @keyframes rainbow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+        .rainbow-effect {
+            background: linear-gradient(-90deg, #ffbf00, #ffa500, #ff5693, #ff0060, #ff852e, #feb224, #ff9130, #ff1493, #ff0020, #ff6520);
+            background-size: 150% 75%;
+            animation: gradient 4.44s ease-in-out infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: bold;
+        }
+        .rainbow-button {
+            background: linear-gradient(-135deg, #4a5568 0%, #5b6b9e 100%);
+            color: white;
+            border: none;
+            font-weight: bold;
+        }
+        .rainbow-button-text {
+            background: linear-gradient(-90deg, #ffbf00, #ffa500, #ff5693, #ff0060, #ff852e, #feb224, #ff9130, #ff1493, #ff0020, #ff6520);
+            background-size: 150% 100%;
+            animation: gradient 4.44s ease-in-out infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .rainbow-input-text {
+            background: linear-gradient(90deg, #ffbf00, #ffa500, #ff5693, #ff0060, #ff852e, #feb224, #ff9130, #ff1493, #ff0020, #ff6520);
+            background-size: 150% 55%;
+            animation: gradient 4.44s ease-in-out infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: bold;
+        }
+        .outlined-title {
+            color: transparent;
+            -webkit-text-stroke: 1.89px #6b7aff;
+            text-stroke: 1.89px #6b7aff;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 1rem;
+        }
+        .modal-content {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+            border: 2px solid #6366f1;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(99, 102, 241, 0.5);
+        }
+        .error-message {
+            animation: fadeOut 3s forwards;
+        }
+        @keyframes gradient {
+	        0% {
+		        background-position: 0% 50%;
+	        }
+            50% {
+		        background-position: 50% 100%;
+	        }
+	        100% {
+		        background-position: 0% 0%;
+	        }
+        }    
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(to bottom right, #581c87, #312e81); color: white; font-family: sans-serif;">
+            <div style="text-align: center;">
+                <h1>Loading AI Confidence Survey...</h1>
+                <p>If this message persists, check browser console (F12)</p>
+            </div>
+        </div>
+    </div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
+        const { useState, useEffect, useRef } = React;
 
         // API configuration
-        const API_BASE = window.location.origin;
+        const API_BASE = '/SurveyAI-UIUC/api';
 
         // Survey questions
         const questions = [
-            "As of today, humans have access to sentient AI",
-            "AI will outperform humans on a standardized exam for Emotional Intelligence: EQ by 2030",
-            "I could compete in the job market without leveraging AI",
-            "A child born Fall 2025 will complete HS in Spring of 2044. Given the child attends your High School: The child will endure *less* hardships on the K-12 path aspiring access to higher education (UIUC) than I did",
-            "I understand how Machine Learning AI models make decisions",
-            "AI will have a net positive impact on your closest social circle/s in a decade in review by 2035"
+            `<b>As of today,</b> humans have access to <i>"Sentient"</i> AI: Capable of conscious perception, feeling, and experiential subjective awareness.`,
+            `AI will outperform humans on a standardized exam for Emotional Intelligence: EQ by <strong>2030</strong> (Ability to recognize, understand, manage, and influence emotions effectively)`,
+            `I could compete in the job market <i>without</i> leveraging AI.`,
+            `A child born today will have a more difficult time accessing higher education (Bachelors Program) than I did: <i>HS Graduation Spring <b>2044</b></i>`,
+            `I understand how <b>Multi-Modal</b> (Text + Image + Speech + Vision) <b>ML/AI Models</b> make decisions.`,
+            `AI will have a <i>net positive impact</i> on my inner social circle/network <i>a decade in review</i> by <b>2035</b>`
         ];
+
+        const questionShortNames = ['Sentience', 'EQ2030', 'Reliance', 'Future Education', 'Understanding', 'Social Impact'];
 
         const App = () => {
             const [currentPage, setCurrentPage] = useState('survey');
-            const [responses, setResponses] = useState(questions.map(() => 0));
+            const [responses, setResponses] = useState(questions.map(() => -0.08));
+            const [ageGroup, setAgeGroup] = useState('');
             const [allData, setAllData] = useState([]);
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
             const [hasSubmitted, setHasSubmitted] = useState(false);
+            const [showModal, setShowModal] = useState(false);
+            const [reminderEmail, setReminderEmail] = useState('');
+            const [reminderCount, setReminderCount] = useState(25);
+            const [emailError, setEmailError] = useState('');
 
-            // Check if user has submitted in this session
             useEffect(() => {
                 const submitted = sessionStorage.getItem('surveySubmitted');
                 if (submitted === 'true') {
@@ -81,7 +180,6 @@
                 }
             }, []);
 
-            // Load data from backend on mount (only if submitted)
             useEffect(() => {
                 if (hasSubmitted) {
                     fetchAllData();
@@ -90,7 +188,7 @@
 
             const fetchAllData = async () => {
                 try {
-                    const response = await fetch(`${API_BASE}/api/responses`);
+                    const response = await fetch(`${API_BASE}/responses`);
                     if (response.ok) {
                         const data = await response.json();
                         setAllData(data);
@@ -114,6 +212,7 @@
                 const timestamp = new Date().toISOString();
                 const newEntry = {
                     timestamp,
+                    age_group: ageGroup || window.__age_group || null,
                     ...responses.reduce((acc, val, idx) => {
                         acc[`q${idx + 1}`] = val;
                         return acc;
@@ -121,7 +220,7 @@
                 };
 
                 try {
-                    const response = await fetch(`${API_BASE}/api/responses`, {
+                    const response = await fetch(`${API_BASE}/submit`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -131,17 +230,11 @@
 
                     if (response.ok) {
                         const result = await response.json();
-                        setResponses(questions.map(() => 0));
-                        
-                        // Mark as submitted in this session
+                        setResponses(questions.map(() => -0.08));
                         sessionStorage.setItem('surveySubmitted', 'true');
                         setHasSubmitted(true);
-                        
-                        alert(`Response submitted successfully! Total responses: ${result.count}\n\nYou can now access the data visualizations in the other tabs.`);
-                        
-                        // Refresh data and switch to export view
                         await fetchAllData();
-                        setCurrentPage('export');
+                        setShowModal(true);
                     } else {
                         throw new Error('Failed to submit response');
                     }
@@ -160,11 +253,11 @@
                     return;
                 }
                 
-                const headers = ['Timestamp', ...questions.map((_, idx) => `Q${idx + 1}`)];
+                const headers = ['Timestamp', 'Age', ...questionShortNames];
                 const csvContent = [
                     headers.join(','),
                     ...allData.map(entry => 
-                        [entry.timestamp, ...questions.map((_, idx) => entry[`q${idx + 1}`])].join(',')
+                        [entry.timestamp, (entry.age_group||''), ...questions.map((_, idx) => entry[`q${idx + 1}`])].join(',')
                     )
                 ].join('\n');
                 
@@ -176,71 +269,86 @@
                 a.click();
             };
 
+            const handleOptOut = () => {
+                setShowModal(false);
+                setCurrentPage('charts');
+            };
+
+            const handleShareRemind = async () => {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!reminderEmail || !emailRegex.test(reminderEmail)) {
+                    setEmailError('show');
+                    setTimeout(() => setEmailError(''), 3000);
+                    return;
+                }
+
+                try {
+                    const reminderData = {
+                        email: reminderEmail,
+                        response_count: reminderCount,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    const response = await fetch(`${API_BASE}/reminder`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(reminderData)
+                    });
+
+                    if (response.ok) {
+                        setShowModal(false);
+                        setCurrentPage('charts');
+                    } else {
+                        console.error('Failed to save reminder');
+                        setShowModal(false);
+                        setCurrentPage('charts');
+                    }
+                } catch (err) {
+                    console.error('Error saving reminder:', err);
+                    setShowModal(false);
+                    setCurrentPage('charts');
+                }
+            };
+
             return (
                 <div className="min-h-screen bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950">
-                    {/* Navigation */}
                     <nav className="bg-purple-950 shadow-lg border-b border-purple-800">
-                        <div className="max-w-md mx-auto px-4 py-3 flex justify-between text-sm">
-                            <button
-                                onClick={() => setCurrentPage('survey')}
-                                className={`px-3 py-2 rounded ${currentPage === 'survey' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:text-white'}`}
-                            >
-                                Survey
-                            </button>
-                            <button
-                                onClick={() => hasSubmitted ? setCurrentPage('export') : alert('Please complete the survey first to view data')}
-                                disabled={!hasSubmitted}
-                                className={`px-3 py-2 rounded ${currentPage === 'export' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}
-                            >
-                                Data {!hasSubmitted && '🔒'}
-                            </button>
-                            <button
-                                onClick={() => hasSubmitted ? setCurrentPage('heatmap') : alert('Please complete the survey first to view correlations')}
-                                disabled={!hasSubmitted}
-                                className={`px-3 py-2 rounded ${currentPage === 'heatmap' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}
-                            >
-                                Heatmap {!hasSubmitted && '🔒'}
-                            </button>
-                            <button
-                                onClick={() => hasSubmitted ? setCurrentPage('distributions') : alert('Please complete the survey first to view distributions')}
-                                disabled={!hasSubmitted}
-                                className={`px-3 py-2 rounded ${currentPage === 'distributions' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}
-                            >
-                                Distributions {!hasSubmitted && '🔒'}
-                            </button>
+                        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between text-xs md:text-sm overflow-x-auto">
+                            <button onClick={() => setCurrentPage('survey')} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'survey' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:text-white'}`}>Survey</button>
+                            <button onClick={() => hasSubmitted && !showModal ? setCurrentPage('data') : alert('Complete survey first')} disabled={!hasSubmitted || showModal} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'data' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted && !showModal ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}>Data {!hasSubmitted && '🔒'}</button>
+                            <button onClick={() => hasSubmitted && !showModal ? setCurrentPage('charts') : alert('Complete survey first')} disabled={!hasSubmitted || showModal} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'charts' && hasSubmitted ? 'bg-purple-600 text-white' : hasSubmitted && !showModal ? 'text-purple-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}>Distributions {!hasSubmitted && '🔒'}</button>
+                            <button onClick={() => hasSubmitted && !showModal ? setCurrentPage('regression') : alert('Complete survey first')} disabled={!hasSubmitted || showModal} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'regression' && hasSubmitted ? 'bg-green-600 text-white' : hasSubmitted && !showModal ? 'text-green-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}>Regression {!hasSubmitted && '🔒'}</button>
+                            <button onClick={() => hasSubmitted && !showModal ? setCurrentPage('analytics') : alert('Complete survey first')} disabled={!hasSubmitted || showModal} className={`px-3 py-2 rounded whitespace-nowrap ${currentPage === 'analytics' && hasSubmitted ? 'bg-cyan-600 text-white' : hasSubmitted && !showModal ? 'text-cyan-300 hover:text-white' : 'text-purple-500 opacity-50 cursor-not-allowed'}`}>Advanced Analytics {!hasSubmitted && '🔒'}</button>
                         </div>
                     </nav>
 
-                    {/* Survey Page */}
                     {currentPage === 'survey' && (
                         <div className="max-w-md mx-auto px-4 py-6">
                             <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
                                 <h1 className="text-2xl font-bold text-purple-100 mb-2">AI Confidence Survey</h1>
                                 <p className="text-sm text-purple-300 mb-6">UIUC MS Business Analytics Research</p>
-                                
-                                <p className="text-xs text-purple-400 mb-6 italic">
-                                    Rate your confidence: Left (-1) = No confidence, Right (+1) = Full confidence
-                                </p>
+                                <p className="text-xs text-purple-400 mb-6 italic">Rate your confidence: Left (-1) = No confidence, Right (+1) = Full confidence, Center (0.00) = Neutral (Lean Left if Unsure)</p>
+
+                                {/* Demographics: Age Group */}
+                                <div className="mb-6">
+                                    <p className="text-sm font-semibold text-purple-100 mb-2">Select your age group:</p>
+                                    <div className="grid grid-cols-2 gap-3 text-purple-200 text-sm">
+                                        {['16-18','19-22','23-26','27-40','40+'].map((label) => (
+                                            <label key={label} className="flex items-center gap-2">
+                                                <input type="radio" name="age_group" value={label} onChange={(e)=>{ setAgeGroup(e.target.value); window.__age_group=e.target.value; }} className="accent-purple-500" />
+                                                <span>{label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
 
                                 {questions.map((question, idx) => (
                                     <div key={idx} className="mb-8">
-                                        <p className="text-sm font-medium text-purple-100 mb-3">
-                                            {idx + 1}. {question}
-                                        </p>
-                                        
+                                        <p className="text-sm font-medium text-purple-100 mb-3" dangerouslySetInnerHTML={{__html: `${idx + 1}. ${question}`}}></p>
                                         <div className="relative">
-                                            <input
-                                                type="range"
-                                                min="-1"
-                                                max="1"
-                                                step="0.01"
-                                                value={responses[idx]}
-                                                onChange={(e) => handleSliderChange(idx, e.target.value)}
-                                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                                style={{
-                                                    background: `linear-gradient(to right, #ef4444 0%, #fbbf24 50%, #10b981 100%)`
-                                                }}
-                                            />
+                                            <input type="range" min="-1" max="1" step="0.01" value={responses[idx]} onChange={(e) => handleSliderChange(idx, e.target.value)} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" style={{background: `linear-gradient(to right, #ef4444 0%, #fbbf24 50%, #10b981 100%)`}} />
                                             <div className="flex justify-between text-xs text-purple-300 mt-1">
                                                 <span>-1.0</span>
                                                 <span className="font-semibold text-amber-400">{responses[idx].toFixed(2)}</span>
@@ -250,106 +358,113 @@
                                     </div>
                                 ))}
 
-                            <button
-                                onClick={handleSubmit}
-                                disabled={loading}
-                                className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {loading ? 'Submitting...' : 'Submit Response'}
-                            </button>
-                                
-                                <p className="text-xs text-center text-purple-400 mt-4">
-                                    {allData.length} response{allData.length !== 1 ? 's' : ''} collected
-                                </p>
+                                <button onClick={handleSubmit} disabled={loading} className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Submitting...' : 'Submit '}<i>Anonymous</i>{loading ? '' : ' Response'}</button>
+                                <p className="text-xs text-center text-purple-400 mt-4">{allData.length} response{allData.length !== 1 ? 's' : ''} collected</p>
                             </div>
                         </div>
                     )}
 
-                    {/* Export Page */}
-                    {currentPage === 'export' && (
-                        <div className="max-w-4xl mx-auto px-4 py-6">
+                    {currentPage === 'data' && (
+                        <div className="max-w-6xl mx-auto px-4 py-6">
                             <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
                                 <h2 className="text-2xl font-bold text-purple-100 mb-4">Survey Dataset</h2>
-                                <p className="text-purple-300 text-sm mb-4">View all responses from the study. You can export this data for your analysis.</p>
-                                
-                            <div className="flex gap-4 mb-6">
-                                <button
-                                    onClick={exportCSV}
-                                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition shadow-lg"
-                                >
-                                    Download CSV
-                                </button>
-                            </div>
-
+                                <p className="text-purple-300 text-sm mb-4">View all responses from the study.</p>
+                                <div className="flex gap-4 mb-6">
+                                    <button onClick={exportCSV} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition shadow-lg">Download CSV</button>
+                                </div>
                                 <p className="text-purple-300 mb-4">Total Responses: {allData.length}</p>
-
                                 {allData.length > 0 && (
                                     <div className="overflow-x-auto">
                                         <table className="min-w-full text-sm">
                                             <thead className="bg-purple-800 bg-opacity-50">
                                                 <tr>
                                                     <th className="px-4 py-2 text-left text-purple-200">Timestamp</th>
-                                                    {questions.map((_, idx) => (
-                                                        <th key={idx} className="px-4 py-2 text-left text-purple-200">Q{idx + 1}</th>
-                                                    ))}
+                                                    <th className="px-4 py-2 text-left text-purple-200">Age</th>
+                                                    {questionShortNames.map((name, idx) => (<th key={idx} className="px-4 py-2 text-left text-purple-200">{name}</th>))}
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {allData.slice(-10).reverse().map((entry, idx) => (
                                                     <tr key={idx} className="border-t border-purple-700">
                                                         <td className="px-4 py-2 text-purple-200">{new Date(entry.timestamp).toLocaleString()}</td>
-                                                        {questions.map((_, qIdx) => (
-                                                            <td key={qIdx} className="px-4 py-2 text-purple-200">{entry[`q${qIdx + 1}`].toFixed(2)}</td>
-                                                        ))}
+                                                        <td className="px-4 py-2 text-purple-200">{entry.age_group || '—'}</td>
+                                                        {questions.map((_, qIdx) => (<td key={qIdx} className="px-4 py-2 text-purple-200">{entry[`q${qIdx + 1}`].toFixed(2)}</td>))}
                                                     </tr>
                                                 ))}
                                             </tbody>
                                         </table>
-                                        {allData.length > 10 && (
-                                            <p className="text-xs text-purple-400 mt-2 text-center">Showing 10 most recent responses</p>
-                                        )}
+                                        {allData.length > 10 && (<p className="text-xs text-purple-400 mt-2 text-center">Showing 10 most recent responses</p>)}
                                     </div>
                                 )}
-
-                                {allData.length === 0 && (
-                                    <p className="text-purple-400 text-center py-8">No data collected yet</p>
-                                )}
+                                {allData.length === 0 && (<p className="text-purple-400 text-center py-8">No data collected yet</p>)}
                             </div>
                         </div>
                     )}
 
-                    {/* Heatmap Page */}
-                    {currentPage === 'heatmap' && hasSubmitted && (
-                        <div className="max-w-4xl mx-auto px-4 py-6">
-                            <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
-                                <h2 className="text-2xl font-bold text-purple-100 mb-4">Correlation Heatmap - OLS Regression</h2>
-                                <p className="text-purple-300 text-sm mb-4">Pearson correlation coefficients between survey questions (current as of your submission)</p>
-                                
-                                {allData.length > 1 ? (
-                                    <CorrelationHeatmap data={allData} questions={questions} />
-                                ) : (
-                                    <p className="text-purple-400 text-center py-8">Need at least 2 responses to show correlations</p>
-                                )}
-                            </div>
-                        </div>
+                    {currentPage === 'charts' && hasSubmitted && (
+                        <ChartsPage data={allData} questions={questions} />
                     )}
 
-                    {/* Distributions Page */}
-                    {currentPage === 'distributions' && hasSubmitted && (
-                        <div className="max-w-6xl mx-auto px-4 py-6">
-                            <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
-                                <h2 className="text-2xl font-bold text-purple-100 mb-4">Response Distributions - Variance Analysis</h2>
-                                <p className="text-purple-300 text-sm mb-4">Statistical distribution for each survey question showing mean, variance, and standard deviation</p>
+                    {currentPage === 'regression' && hasSubmitted && (
+                        <RegressionPage data={allData} questions={questions} />
+                    )}
+
+                    {currentPage === 'analytics' && hasSubmitted && (
+                        <AdvancedAnalytics data={allData} questions={questions} />
+                    )}
+
+                    {showModal && (
+                        <div className="modal-overlay">
+                            <div className="modal-content">
+                                <h2 className="outlined-title text-4xl mb-6 text-center">Thank You for Participating!</h2>
+                                <p className="text-purple-200 text-center mb-6">
+                                    Remind me once <input 
+                                        type="number" 
+                                        value={reminderCount} 
+                                        onChange={(e) => setReminderCount(parseInt(e.target.value) || 25)}
+                                        className="w-16 px-3 py-1 rounded bg-purple-800 border border-purple-600 text-center mx-1 rainbow-input-text focus:outline-none focus:border-purple-400"
+                                        min="1"
+                                        max="9999"
+                                        style={{caretColor: 'white'}}
+                                    /> <b>responses</b> are collected
+                                </p>
+                                <div className="mb-4">
+                                    <input 
+                                        type="email" 
+                                        placeholder="Your email here"
+                                        value={reminderEmail}
+                                        onChange={(e) => setReminderEmail(e.target.value)}
+                                        className="w-full px-4 py-2 rounded bg-purple-800 border border-purple-600 text-purple-100 placeholder-purple-400 focus:outline-none focus:border-purple-400"
+                                    />
+                                </div>
+                                <p className="text-xs text-purple-300 text-center mb-6">(from portal@glowstone.llc)</p>
                                 
-                                {allData.length > 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {questions.map((question, idx) => (
-                                            <DistributionChart key={idx} data={allData} questionIndex={idx} question={question} />
-                                        ))}
+                                {emailError && (
+                                    <div className="error-message text-center mb-4">
+                                        <span className="text-sm text-purple-200">
+                                            To <span className="rainbow-effect">SHARE & REMIND</span> - Input a valid Email Address
+                                        </span>
                                     </div>
-                                ) : (
-                                    <p className="text-purple-400 text-center py-8">No data to display</p>
                                 )}
+
+                                <div className="flex justify-center gap-3 mb-4">
+                                    <button 
+                                        onClick={handleOptOut}
+                                        className="px-6 py-2 rounded bg-gray-400 text-gray-700 hover:bg-gray-500 transition font-semibold"
+                                    >
+                                        OPT OUT
+                                    </button>
+                                    <button 
+                                        onClick={handleShareRemind}
+                                        className="rainbow-button px-6 py-2 rounded shadow-lg hover:shadow-xl transition"
+                                    >
+                                        <span className="rainbow-button-text">SHARE & REMIND</span>
+                                    </button>
+                                </div>
+
+                                <p className="text-xs italic text-center text-purple-400">
+                                    GLOWSTONE LLC Reserves the right to &lt;Store&gt; your Contact Information {'{'}EMAIL@ADDRESS{'}'} in our Secure databases Hosted on Namecheap Stellar
+                                </p>
                             </div>
                         </div>
                     )}
@@ -357,128 +472,1162 @@
             );
         };
 
-        // Correlation Heatmap Component
-        const CorrelationHeatmap = ({ data, questions }) => {
-            const calculateCorrelation = (arr1, arr2) => {
-                const n = arr1.length;
-                const mean1 = arr1.reduce((a, b) => a + b, 0) / n;
-                const mean2 = arr2.reduce((a, b) => a + b, 0) / n;
-                
-                let numerator = 0;
-                let denom1 = 0;
-                let denom2 = 0;
-                
-                for (let i = 0; i < n; i++) {
-                    const diff1 = arr1[i] - mean1;
-                    const diff2 = arr2[i] - mean2;
-                    numerator += diff1 * diff2;
-                    denom1 += diff1 * diff1;
-                    denom2 += diff2 * diff2;
+        // Charts Page with Histograms
+        const ChartsPage = ({ data, questions }) => {
+            const chartRefs = useRef([]);
+            const ageChartRef = useRef(null);
+
+            useEffect(() => {
+                if (data.length === 0) return;
+
+                chartRefs.current.forEach(chart => { if (chart) chart.destroy(); });
+                chartRefs.current = [];
+                if (ageChartRef.current) { ageChartRef.current.destroy(); ageChartRef.current = null; }
+
+                // Age histogram at top if age_group exists
+                const ageCanvas = document.getElementById('age-histogram');
+                if (ageCanvas && data.some(d => d.age_group)) {
+                    const buckets = ['16-18','19-22','23-26','27-40','40+'];
+                    const counts = buckets.map(b => data.filter(d => d.age_group === b).length);
+                    ageChartRef.current = new Chart(ageCanvas, {
+                        type: 'bar',
+                        data: { labels: buckets, datasets: [{ label: 'Count', data: counts, backgroundColor: 'rgba(147, 197, 253, 0.7)', borderColor: 'rgba(147, 197, 253, 1)', borderWidth: 2 }] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: 'Age Distribution', color: '#c4b5fd', font: { size: 16, weight: 'bold' } } }, scales: { x: { ticks: { color: '#c4b5fd' } }, y: { beginAtZero: true, ticks: { color: '#c4b5fd' } } } }
+                    });
                 }
-                
-                return numerator / Math.sqrt(denom1 * denom2);
-            };
 
-            const correlationMatrix = questions.map((_, i) => {
-                return questions.map((_, j) => {
-                    const values1 = data.map(d => d[`q${i + 1}`]);
-                    const values2 = data.map(d => d[`q${j + 1}`]);
-                    return calculateCorrelation(values1, values2);
-                });
-            });
+                questions.forEach((question, idx) => {
+                    const canvas = document.getElementById(`chart-${idx}`);
+                    if (!canvas) return;
 
-            const getColor = (value) => {
-                if (value > 0) {
-                    const intensity = Math.floor(value * 255);
-                    return `rgb(${255 - intensity}, ${255 - intensity}, 255)`;
-                } else {
-                    const intensity = Math.floor(Math.abs(value) * 255);
-                    return `rgb(255, ${255 - intensity}, ${255 - intensity})`;
-                }
-            };
-
-            return (
-                <div className="overflow-x-auto">
-                    <table className="mx-auto text-xs">
-                        <thead>
-                            <tr>
-                                <th className="text-purple-200"></th>
-                                {questions.map((_, idx) => (
-                                    <th key={idx} className="px-2 py-1 text-purple-200">Q{idx + 1}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {correlationMatrix.map((row, i) => (
-                                <tr key={i}>
-                                    <td className="font-semibold px-2 py-1 text-purple-200">Q{i + 1}</td>
-                                    {row.map((value, j) => (
-                                        <td
-                                            key={j}
-                                            className="px-2 py-1 text-center border border-purple-700 text-purple-100"
-                                            style={{ backgroundColor: getColor(value) }}
-                                        >
-                                            {value.toFixed(2)}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    const values = data.map(d => d[`q${idx + 1}`]);
                     
-                    <div className="mt-6">
-                        <h3 className="font-semibold mb-2 text-purple-200">Questions:</h3>
-                        {questions.map((q, idx) => (
-                            <p key={idx} className="text-xs text-purple-300 mb-1">
-                                Q{idx + 1}: {q}
-                            </p>
-                        ))}
+                    // Calculate mean and std
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+                    const std = Math.sqrt(variance);
+
+                    // Create bins with size 0.25
+                    const binSize = 0.25;
+                    const bins = {};
+                    for (let i = -1; i <= 1; i += binSize) {
+                        bins[i.toFixed(2)] = 0;
+                    }
+
+                    // Count values in each bin
+                    values.forEach(v => {
+                        const binKey = (Math.floor(v / binSize) * binSize).toFixed(2);
+                        if (bins[binKey] !== undefined) {
+                            bins[binKey]++;
+                        }
+                    });
+
+                    const binLabels = Object.keys(bins);
+                    const binCounts = Object.values(bins);
+
+                    // Plugin to draw vertical mean line at precise position
+                    const meanLinePlugin = {
+                        id: 'meanLine',
+                        afterDraw: (chart) => {
+                            const ctx = chart.ctx;
+                            const xAxis = chart.scales.x;
+                            const yAxis = chart.scales.y;
+                            
+                            // Calculate exact position of mean value
+                            // Map mean from [-1, 1] to pixel position
+                            const minVal = -1;
+                            const maxVal = 1;
+                            const chartWidth = xAxis.right - xAxis.left;
+                            
+                            // Calculate pixel position based on actual mean value
+                            const normalizedPosition = (mean - minVal) / (maxVal - minVal);
+                            const x = xAxis.left + (normalizedPosition * chartWidth);
+                            
+                            const topY = yAxis.top;
+                            const bottomY = yAxis.bottom;
+                            
+                            // Draw vertical line at precise position
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(x, topY);
+                            ctx.lineTo(x, bottomY);
+                            ctx.lineWidth = 3;
+                            ctx.strokeStyle = 'rgb(255, 0, 0)';
+                            ctx.setLineDash([5, 5]);
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    };
+
+                    const chart = new Chart(canvas, {
+                        type: 'bar',
+                        data: {
+                            labels: binLabels,
+                            datasets: [{
+                                label: 'Frequency',
+                                data: binCounts,
+                                backgroundColor: 'rgba(34, 211, 238, 0.7)',
+                                borderColor: 'rgba(34, 211, 238, 1)',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: {
+                                    display: true,
+                                    text: `Mean: ${mean.toFixed(3)} | Std: ${std.toFixed(3)}`,
+                                    color: '#fbbf24',
+                                    font: { size: 13, weight: 'bold' }
+                                }
+                            },
+                            scales: {
+                                x: { 
+                                    title: { display: true, text: 'Confidence Value', color: '#c4b5fd' },
+                                    ticks: { color: '#c4b5fd', maxRotation: 45, minRotation: 45 }, 
+                                    grid: { color: 'rgba(107, 33, 168, 0.2)' }
+                                },
+                                y: { 
+                                    title: { display: true, text: 'Count', color: '#c4b5fd' },
+                                    ticks: { color: '#c4b5fd', stepSize: 1 }, 
+                                    grid: { color: 'rgba(107, 33, 168, 0.2)' },
+                                    beginAtZero: true
+                                }
+                            }
+                        },
+                        plugins: [meanLinePlugin]
+                    });
+
+                    chartRefs.current.push(chart);
+                });
+
+                return () => { chartRefs.current.forEach(chart => { if (chart) chart.destroy(); }); if (ageChartRef.current) ageChartRef.current.destroy(); };
+            }, [data, questions]);
+
+            if (data.length === 0) {
+                return (
+                    <div className="max-w-4xl mx-auto px-4 py-6">
+                        <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                            <p className="text-purple-400 text-center py-8">No data to display</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
+                        <h2 className="text-2xl font-bold text-purple-100 mb-2">Response Distributions</h2>
+                        <p className="text-purple-300 text-sm mb-6">Histograms with bin size 0.25 showing mean and standard deviation</p>
+                        <div className="bg-purple-800 bg-opacity-30 rounded-lg p-4 border border-purple-700 mb-6">
+                            <div style={{ height: '220px' }}>
+                                <canvas id="age-histogram"></canvas>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {questions.map((question, idx) => (
+                                <div key={idx} className="bg-purple-800 bg-opacity-30 rounded-lg p-4 border border-purple-700">
+                                    <h3 className="text-sm font-semibold text-purple-100 mb-2">{questionShortNames[idx]}</h3>
+                                    <div style={{ height: '250px' }}>
+                                        <canvas id={`chart-${idx}`}></canvas>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             );
         };
 
-        // Distribution Chart Component
-        const DistributionChart = ({ data, questionIndex, question }) => {
-            const values = data.map(d => d[`q${questionIndex + 1}`]);
-            
-            // Create bins
-            const bins = Array.from({ length: 20 }, (_, i) => {
-                const binStart = -1 + (i * 0.1);
-                const binEnd = binStart + 0.1;
-                const count = values.filter(v => v >= binStart && v < binEnd).length;
-                return {
-                    range: binStart.toFixed(1),
-                    count
-                };
-            });
+        // Matrix helper functions for regression (defined outside component to avoid recreation)
+        const transpose = (matrix) => {
+            return matrix[0].map((_, i) => matrix.map(row => row[i]));
+        };
 
-            const mean = values.reduce((a, b) => a + b, 0) / values.length;
-            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+        const matrixMultiply = (A, B) => {
+            const result = [];
+            for (let i = 0; i < A.length; i++) {
+                result[i] = [];
+                for (let j = 0; j < B[0].length; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < A[0].length; k++) {
+                        sum += A[i][k] * B[k][j];
+                    }
+                    result[i][j] = sum;
+                }
+            }
+            return result;
+        };
+
+        // Pseudo-inverse using SVD-like approach with regularization (handles singular matrices)
+        const invertMatrix = (matrix) => {
+            const n = matrix.length;
+            const augmented = matrix.map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => i === j ? 1 : 0)]);
+            
+            // Add small regularization to diagonal to handle near-singular matrices (Ridge regression approach)
+            const lambda = 1e-6;
+            for (let i = 0; i < n; i++) {
+                augmented[i][i] += lambda;
+            }
+            
+            for (let i = 0; i < n; i++) {
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
+                        maxRow = k;
+                    }
+                }
+                [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+                
+                const pivot = augmented[i][i];
+                if (Math.abs(pivot) < 1e-10) {
+                    console.warn('Matrix is highly singular even with regularization for row', i);
+                    // Continue with very small value instead of failing
+                    augmented[i][i] = 1e-8;
+                }
+                
+                const divisor = augmented[i][i];
+                for (let j = 0; j < 2 * n; j++) {
+                    augmented[i][j] /= divisor;
+                }
+                
+                for (let k = 0; k < n; k++) {
+                    if (k !== i) {
+                        const factor = augmented[k][i];
+                        for (let j = 0; j < 2 * n; j++) {
+                            augmented[k][j] -= factor * augmented[i][j];
+                        }
+                    }
+                }
+            }
+            
+            return augmented.map(row => row.slice(n));
+        };
+
+        const solveLinearSystem = (A, b) => {
+            try {
+                const AInv = invertMatrix(A);
+                return AInv.map(row => row.reduce((sum, val, i) => sum + val * b[i], 0));
+            } catch (error) {
+                console.error('Cannot solve linear system:', error);
+                return null;
+            }
+        };
+
+        // Regression Page - Multivariate Linear Models (using FastAPI backend)
+        const RegressionPage = ({ data, questions }) => {
+            const [regressionStats, setRegressionStats] = useState(null);
+            const [ageRegressionStats, setAgeRegressionStats] = useState(null);
+            const [selectedAgeBin, setSelectedAgeBin] = useState(0);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                const fetchRegression = async () => {
+                    if (data.length < 6) {
+                        console.log('Not enough data for regression:', data.length);
+                        setLoading(false);
+                        return;
+                    }
+
+                    console.log('Fetching regression analysis from backend...');
+                    setLoading(true);
+                    setError(null);
+
+                    try {
+                        const [responseQ, responseAge] = await Promise.all([
+                            fetch(`${API_BASE}/regression`),
+                            fetch(`${API_BASE}/regression-age`)
+                        ]);
+                        
+                        if (!responseQ.ok) {
+                            throw new Error('Failed to fetch Q regression analysis');
+                        }
+                        
+                        const resultsQ = await responseQ.json();
+                        console.log('Received Q regression results:', resultsQ.length, 'models');
+                        setRegressionStats(resultsQ);
+
+                        if (responseAge.ok) {
+                            const resultsAge = await responseAge.json();
+                            console.log('Received Age regression results:', resultsAge.length, 'models');
+                            setAgeRegressionStats(resultsAge);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching regression:', err);
+                        setError(err.message);
+                        setRegressionStats([]);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                fetchRegression();
+            }, [data]);
+
+            if (data.length < 6) {
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-6">
+                        <div className="bg-green-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-green-700">
+                            <p className="text-green-300 text-center py-8">Need at least 6 responses for regression analysis</p>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
-                <div className="border border-purple-700 rounded-lg p-4 bg-purple-800 bg-opacity-30">
-                    <h3 className="text-sm font-semibold mb-2 text-purple-100">Q{questionIndex + 1}: {question.substring(0, 50)}...</h3>
-                    <div className="text-xs text-purple-300 mb-2">
-                        Mean: {mean.toFixed(3)} | Variance: {variance.toFixed(3)} | Std Dev: {Math.sqrt(variance).toFixed(3)}
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    <div className="bg-green-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-green-700">
+                        <h2 className="text-3xl font-bold text-green-100 mb-2">Multivariate Regression Analysis</h2>
+                        <p className="text-green-300 text-sm mb-6">OLS regression models predicting each feature from the other 5 features + age bins (reference group: Age 16-18)</p>
+
+                        {/* Age Bin Prediction Models - Dropdown Selector */}
+                        {ageRegressionStats && ageRegressionStats.length > 0 && (
+                            <div className="mb-6 bg-blue-900 bg-opacity-30 rounded-lg p-5 border border-blue-600">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-lg font-bold text-blue-100">Age Bin Prediction</h3>
+                                    <select 
+                                        value={selectedAgeBin} 
+                                        onChange={(e) => setSelectedAgeBin(parseInt(e.target.value))}
+                                        className="bg-blue-800 border border-blue-600 rounded px-3 py-1 text-blue-100 text-sm"
+                                    >
+                                        {ageRegressionStats.map((stat, idx) => (
+                                            <option key={idx} value={idx}>
+                                                {stat.ageLabel} ({stat.ageBin}) - n={stat.count}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {(() => {
+                                    const stat = ageRegressionStats[selectedAgeBin];
+                                    return (
+                                        <>
+                                            <p className="text-xs text-blue-300 mb-4 italic">Predicting probability of being in {stat.ageLabel} age bin from the six question features</p>
+                                            
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                                <div className="bg-blue-700 bg-opacity-40 rounded p-3">
+                                                    <p className="text-xs text-blue-300">Adj R²</p>
+                                                    <p className="text-xl font-bold text-blue-100">{stat.adjR2.toFixed(4)}</p>
+                                                </div>
+                                                <div className="bg-blue-700 bg-opacity-40 rounded p-3">
+                                                    <p className="text-xs text-blue-300">R²</p>
+                                                    <p className="text-xl font-bold text-blue-100">{stat.r2.toFixed(4)}</p>
+                                                </div>
+                                                <div className="bg-blue-700 bg-opacity-40 rounded p-3">
+                                                    <p className="text-xs text-blue-300">RMSE</p>
+                                                    <p className="text-xl font-bold text-blue-100">{stat.rmse.toFixed(4)}</p>
+                                                </div>
+                                                <div className="bg-blue-700 bg-opacity-40 rounded p-3">
+                                                    <p className="text-xs text-blue-300">Samples</p>
+                                                    <p className="text-xl font-bold text-blue-100">{stat.count} / {stat.n}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-blue-800 bg-opacity-50">
+                                                        <tr>
+                                                            <th className="px-3 py-2 text-left text-blue-200">Predictor</th>
+                                                            <th className="px-3 py-2 text-right text-blue-200">Beta (β)</th>
+                                                            <th className="px-3 py-2 text-right text-blue-200">Std Error</th>
+                                                            <th className="px-3 py-2 text-right text-blue-200">t-statistic</th>
+                                                            <th className="px-3 py-2 text-right text-blue-200">P-value</th>
+                                                            <th className="px-3 py-2 text-center text-blue-200">Sig.</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="text-blue-100">
+                                                        <tr className="border-t border-blue-700">
+                                                            <td className="px-3 py-2 font-mono">(Intercept)</td>
+                                                            <td className="px-3 py-2 text-right font-mono">{stat.beta[0].toFixed(4)}</td>
+                                                            <td className="px-3 py-2 text-right font-mono">{stat.standardErrors[0].toFixed(4)}</td>
+                                                            <td className="px-3 py-2 text-right font-mono">{stat.tStats[0].toFixed(3)}</td>
+                                                            <td className="px-3 py-2 text-right font-mono">{stat.pValues[0] < 0.01 ? '<0.01' : stat.pValues[0].toFixed(3)}</td>
+                                                            <td className="px-3 py-2 text-center">{stat.pValues[0] < 0.05 ? '*' : ''}</td>
+                                                        </tr>
+                                                        {stat.predictorLabels && stat.predictorLabels.map((label, i) => (
+                                                            <tr key={`${label}-${i}`} className="border-t border-blue-700">
+                                                                <td className="px-3 py-2 font-semibold">{label}</td>
+                                                                <td className="px-3 py-2 text-right font-mono">{stat.beta[i + 1].toFixed(4)}</td>
+                                                                <td className="px-3 py-2 text-right font-mono">{stat.standardErrors[i + 1].toFixed(4)}</td>
+                                                                <td className="px-3 py-2 text-right font-mono">{stat.tStats[i + 1].toFixed(3)}</td>
+                                                                <td className="px-3 py-2 text-right font-mono">{stat.pValues[i + 1] < 0.01 ? '<0.01' : stat.pValues[i + 1].toFixed(3)}</td>
+                                                                <td className="px-3 py-2 text-center font-bold">{stat.pValues[i + 1] < 0.05 ? '**' : stat.pValues[i + 1] < 0.10 ? '*' : ''}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <p className="text-xs text-blue-400 mt-2">* p &lt; 0.10, ** p &lt; 0.05</p>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
+                        {!regressionStats && (
+                            <div className="text-center py-8">
+                                <p className="text-green-300">Calculating regression models...</p>
+                            </div>
+                        )}
+
+                        {regressionStats && regressionStats.length === 0 && (
+                            <div className="text-center py-8">
+                                <p className="text-red-300">Unable to calculate any regression models. This may happen with insufficient data variation.</p>
+                                <p className="text-red-200 text-xs mt-2">Check browser console for details.</p>
+                            </div>
+                        )}
+
+                        {regressionStats && regressionStats.length > 0 && regressionStats.length < 6 && (
+                            <div className="bg-yellow-900 bg-opacity-30 rounded-lg p-4 mb-4 border border-yellow-600">
+                                <p className="text-yellow-200 text-sm">
+                                    Note: Only {regressionStats.length} of 6 models calculated successfully. 
+                                    Some models failed due to multicollinearity or insufficient data variation.
+                                </p>
+                            </div>
+                        )}
+
+                        <h3 className="text-2xl font-bold text-green-100 mb-4 mt-6">Feature Prediction Models</h3>
+                        <p className="text-green-300 text-sm mb-4">Each feature predicted from the other 5 features + age bins</p>
+
+                        {regressionStats && regressionStats.length > 0 && regressionStats.map((stat, idx) => {
+                            const featureTitles = [
+                                'Present-Day Sentience Confidence',
+                                'EQ2030 Confidence',
+                                'AI Reliance Confidence',
+                                'Future Education Accessibility Confidence',
+                                'ML/AI Model Understanding Confidence',
+                                'Social Impact Confidence'
+                            ];
+                            return (
+                            <div key={idx} className="mb-6 bg-green-800 bg-opacity-30 rounded-lg p-5 border border-green-600">
+                                <h3 className="text-lg font-bold text-green-100 mb-3">
+                                    Model {idx + 1}: Predicting {featureTitles[stat.targetIdx]}
+                                </h3>
+                                <p className="text-xs text-green-300 mb-4 italic">{stat.targetQuestion}</p>
+                                
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                    <div className="bg-green-700 bg-opacity-40 rounded p-3">
+                                        <p className="text-xs text-green-300">Adj R²</p>
+                                        <p className="text-xl font-bold text-green-100">{stat.adjR2.toFixed(4)}</p>
+                                    </div>
+                                    <div className="bg-green-700 bg-opacity-40 rounded p-3">
+                                        <p className="text-xs text-green-300">R²</p>
+                                        <p className="text-xl font-bold text-green-100">{stat.r2.toFixed(4)}</p>
+                                    </div>
+                                    <div className="bg-green-700 bg-opacity-40 rounded p-3">
+                                        <p className="text-xs text-green-300">RMSE</p>
+                                        <p className="text-xl font-bold text-green-100">{stat.rmse.toFixed(4)}</p>
+                                    </div>
+                                    <div className="bg-green-700 bg-opacity-40 rounded p-3">
+                                        <p className="text-xs text-green-300">n</p>
+                                        <p className="text-xl font-bold text-green-100">{stat.n}</p>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-green-800 bg-opacity-50">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-green-200">Predictor</th>
+                                                <th className="px-3 py-2 text-right text-green-200">Beta (β)</th>
+                                                <th className="px-3 py-2 text-right text-green-200">Std Error</th>
+                                                <th className="px-3 py-2 text-right text-green-200">t-statistic</th>
+                                                <th className="px-3 py-2 text-right text-green-200">P-value</th>
+                                                <th className="px-3 py-2 text-center text-green-200">Sig.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="text-green-100">
+                                            <tr className="border-t border-green-700">
+                                                <td className="px-3 py-2 font-mono">(Intercept)</td>
+                                                <td className="px-3 py-2 text-right font-mono">{stat.beta[0]?.toFixed(4) || '—'}</td>
+                                                <td className="px-3 py-2 text-right font-mono">{stat.standardErrors[0]?.toFixed(4) || '—'}</td>
+                                                <td className="px-3 py-2 text-right font-mono">{stat.tStats[0]?.toFixed(3) || '—'}</td>
+                                                <td className="px-3 py-2 text-right font-mono">{stat.pValues[0] != null ? (stat.pValues[0] < 0.01 ? '<0.01' : stat.pValues[0].toFixed(3)) : '—'}</td>
+                                                <td className="px-3 py-2 text-center">{stat.pValues[0] < 0.05 ? '*' : ''}</td>
+                                            </tr>
+                                            {stat.predictorLabels && stat.predictorLabels.length > 0 && stat.predictorLabels.map((label, i) => (
+                                                <tr key={`${label}-${i}`} className="border-t border-green-700">
+                                                    <td className="px-3 py-2 font-semibold">{label}</td>
+                                                    <td className="px-3 py-2 text-right font-mono">{stat.beta[i + 1]?.toFixed(4) || '—'}</td>
+                                                    <td className="px-3 py-2 text-right font-mono">{stat.standardErrors[i + 1]?.toFixed(4) || '—'}</td>
+                                                    <td className="px-3 py-2 text-right font-mono">{stat.tStats[i + 1]?.toFixed(3) || '—'}</td>
+                                                    <td className="px-3 py-2 text-right font-mono">{stat.pValues[i + 1] != null ? (stat.pValues[i + 1] < 0.01 ? '<0.01' : stat.pValues[i + 1].toFixed(3)) : '—'}</td>
+                                                    <td className="px-3 py-2 text-center font-bold">{stat.pValues[i + 1] < 0.05 ? '**' : stat.pValues[i + 1] < 0.10 ? '*' : ''}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p className="text-xs text-green-400 mt-2">* p &lt; 0.10, ** p &lt; 0.05</p>
+                            </div>
+                            );
+                        })}
                     </div>
-                    <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={bins}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#6b21a8" />
-                            <XAxis dataKey="range" tick={{ fontSize: 10, fill: '#c4b5fd' }} />
-                            <YAxis tick={{ fontSize: 10, fill: '#c4b5fd' }} />
-                            <Tooltip contentStyle={{ backgroundColor: '#581c87', border: '1px solid #7c3aed' }} />
-                            <Bar dataKey="count" fill="#a855f7" />
-                        </BarChart>
-                    </ResponsiveContainer>
+                </div>
+            );
+        };
+
+        // Advanced Analytics Component
+        const AdvancedAnalytics = ({ data, questions }) => {
+            const [stats, setStats] = useState(null);
+            const [analytics, setAnalytics] = useState(null);
+            const [topCount, setTopCount] = useState(4);
+            const [showAgeInMatrices, setShowAgeInMatrices] = useState(false);
+            const covChartRef = useRef(null);
+            const scatterChartRefs = useRef([]);
+            const boxplotChartRef = useRef(null);
+            const pcaVarChartRef = useRef(null);
+            const pcaScreeChartRef = useRef(null);
+
+            // Helper to compute pairs - Q vs Q, plus only 6 Age (Y) vs each Q (X)
+            const getTopPairs = () => {
+                const corr = analytics?.corr_matrix || stats?.correlation || [];
+                const cols = analytics?.columns || questionShortNames || [];
+                if (!corr || corr.length === 0) return [];
+
+                const pairs = [];
+                const numQ = 6;
+
+                // Q vs Q pairs (exclude diagonal)
+                for (let i = 0; i < numQ; i++) {
+                    for (let j = 0; j < numQ; j++) {
+                        if (i === j) continue;
+                        const r = corr[i]?.[j] || 0;
+                        const r2 = r * r;
+                        pairs.push({
+                            qx: i,
+                            qy: j,
+                            r,
+                            r2,
+                            absr2: Math.abs(r2),
+                            labelX: cols[i] || `Q${i+1}`,
+                            labelY: cols[j] || `Q${j+1}`,
+                            isAge: false
+                        });
+                    }
+                }
+
+                // Add ONLY 6 Age (Y) vs Q (X) pairs (treat age as a single categorical variable)
+                const hasAge = Array.isArray(data) && data.some(d => d && d.age_group);
+                if (hasAge) {
+                    const ageMap = {'16-18': 0, '19-22': 1, '23-26': 2, '27-40': 3, '40+': 4};
+                    for (let qIdx = 0; qIdx < numQ; qIdx++) {
+                        // Build aligned arrays with age present
+                        const points = data.filter(d => d.age_group != null && d[`q${qIdx+1}`] != null);
+                        if (points.length < 2) continue;
+                        const xs = points.map(d => d[`q${qIdx+1}`]);
+                        const ys = points.map(d => ageMap[d.age_group] ?? 2);
+                        // Compute Pearson r between xs and ys
+                        const n = xs.length;
+                        const sumX = xs.reduce((s,v)=>s+v,0);
+                        const sumY = ys.reduce((s,v)=>s+v,0);
+                        const sumXY = xs.reduce((s,_,i)=>s+xs[i]*ys[i],0);
+                        const sumX2 = xs.reduce((s,v)=>s+v*v,0);
+                        const sumY2 = ys.reduce((s,v)=>s+v*v,0);
+                        const denom = Math.sqrt((n*sumX2 - sumX*sumX) * (n*sumY2 - sumY*sumY)) || 0;
+                        const r = denom ? ((n*sumXY - sumX*sumY) / denom) : 0;
+                        const r2 = r * r;
+                        pairs.push({
+                            qx: qIdx,
+                            qy: 6, // sentinel to mark age on Y
+                            r,
+                            r2,
+                            absr2: Math.abs(r2),
+                            labelX: cols[qIdx] || `Q${qIdx+1}`,
+                            labelY: 'Age',
+                            isAge: true
+                        });
+                    }
+                }
+
+                pairs.sort((a,b)=> b.absr2 - a.absr2);
+                return pairs;
+            };
+            // Fetch backend analytics (alpha, KMO, PCA) only when data length changes
+            useEffect(() => {
+                if (data.length < 2) return;
+                (async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/analytics`);
+                        if (res.ok) {
+                            const aj = await res.json();
+                            setAnalytics(aj);
+                        }
+                    } catch (e) {
+                        console.warn('Analytics fetch failed', e);
+                    }
+                })();
+            }, [data.length]);
+
+            useEffect(() => {
+                if (data.length < 2) return;
+
+                // Calculate statistics
+                const matrix = questions.map((_, i) => data.map(d => d[`q${i + 1}`]));
+                
+                // Means
+                const means = matrix.map(col => col.reduce((a, b) => a + b, 0) / col.length);
+                
+                // Correlation Matrix
+                const correlation = matrix.map((row1, i) => 
+                    matrix.map((row2, j) => {
+                        const mean1 = means[i];
+                        const mean2 = means[j];
+                        const n = row1.length;
+                        let numerator = 0, denom1 = 0, denom2 = 0;
+                        for (let k = 0; k < n; k++) {
+                            const diff1 = row1[k] - mean1;
+                            const diff2 = row2[k] - mean2;
+                            numerator += diff1 * diff2;
+                            denom1 += diff1 * diff1;
+                            denom2 += diff2 * diff2;
+                        }
+                        return numerator / Math.sqrt(denom1 * denom2) || 0;
+                    })
+                );
+
+                // Covariance Matrix
+                const covariance = matrix.map((row1, i) => 
+                    matrix.map((row2, j) => {
+                        const mean1 = means[i];
+                        const mean2 = means[j];
+                        return row1.reduce((sum, val, k) => sum + (val - mean1) * (row2[k] - mean2), 0) / (row1.length - 1);
+                    })
+                );
+
+                // Standard deviations
+                const stdDevs = matrix.map((col, i) => {
+                    const variance = col.reduce((sum, v) => sum + Math.pow(v - means[i], 2), 0) / (col.length - 1);
+                    return Math.sqrt(variance);
+                });
+
+                // Simple PCA (first 2 components)
+                // Center data
+                const centered = matrix.map((col, i) => col.map(v => v - means[i]));
+                
+                setStats({ correlation, covariance, means, stdDevs, centered });
+
+                // Create/Update variance bar chart - SORTED by greatest to least
+                if (covChartRef.current) { covChartRef.current.destroy(); covChartRef.current = null; }
+                const covCanvas = document.getElementById('covariance-chart');
+                if (covCanvas) {
+                    const variances = stdDevs.map((sd, i) => ({ q: i, variance: sd * sd }));
+                    variances.sort((a, b) => b.variance - a.variance);
+                    const maxVariance = Math.max(...variances.map(v => v.variance));
+                    
+                    covChartRef.current = new Chart(covCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: variances.map(v => `Q${v.q+1}`),
+                            datasets: [{
+                                label: 'Variance',
+                                data: variances.map(v => v.variance),
+                                backgroundColor: 'rgba(167, 139, 250, 0.7)',
+                                borderColor: 'rgba(167, 139, 250, 1)',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: true, text: 'Variance by Question (Sorted)', color: '#a78bfa', font: { size: 16, weight: 'bold' } }
+                            },
+                            scales: {
+                                x: { ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(167, 139, 250, 0.2)' } },
+                                y: { 
+                                    title: { display: true, text: 'Variance (σ²)', color: '#c4b5fd' },
+                                    ticks: { color: '#c4b5fd' }, 
+                                    grid: { color: 'rgba(167, 139, 250, 0.2)' },
+                                    beginAtZero: true,
+                                    max: maxVariance * 1.1
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Create/Update Q vs Q scatter plots with regression lines - TOP N by |R^2|
+                scatterChartRefs.current.forEach(chart => { try { chart?.destroy(); } catch(e){} });
+                scatterChartRefs.current = [];
+
+                const topPairs = getTopPairs().slice(0, topCount);
+
+                topPairs.forEach((pair, idx) => {
+                    const { qx, qy, r2, labelX, labelY, isAge } = pair;
+                    const canvasId = `scatter-chart-${idx}`;
+                    const canvas = document.getElementById(canvasId);
+                    if (!canvas) return;
+                    
+                    let scatterData = [];
+                    let xScale, yScale, regLine;
+                    
+                    if (isAge) {
+                        // Q (X-axis) vs Age (Y-axis)
+                        const ageMap = {'16-18': 0, '19-22': 1, '23-26': 2, '27-40': 3, '40+': 4};
+                        scatterData = data.filter(d => d.age_group && d[`q${qx+1}`] != null).map(d => ({ 
+                            x: d[`q${qx+1}`], 
+                            y: ageMap[d.age_group] ?? 2 
+                        }));
+                        
+                        // Calculate regression
+                        const n = scatterData.length;
+                        if (n < 2) return; // Skip if not enough data
+                        
+                        const sumX = scatterData.reduce((s, p) => s + p.x, 0);
+                        const sumY = scatterData.reduce((s, p) => s + p.y, 0);
+                        const sumXY = scatterData.reduce((s, p) => s + p.x * p.y, 0);
+                        const sumX2 = scatterData.reduce((s, p) => s + p.x * p.x, 0);
+                        
+                        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                        const intercept = (sumY - slope * sumX) / n;
+                        
+                        regLine = [{ x: -1, y: slope * -1 + intercept }, { x: 1, y: slope * 1 + intercept }];
+                        
+                        xScale = { min: -1, max: 1, ticks: { color: '#c4b5fd', font: { size: 8 } }, grid: { color: 'rgba(34, 211, 238, 0.2)' } };
+                        yScale = { min: 0, max: 4, ticks: { color: '#c4b5fd', font: { size: 8 }, callback: (v) => ['Teen','Ugrad','Grad','Work','Older'][Math.round(v)] || '' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } };
+                    } else {
+                        // Q vs Q
+                        scatterData = data.filter(d => d[`q${qx+1}`] != null && d[`q${qy+1}`] != null).map(d => ({ 
+                            x: d[`q${qx+1}`], 
+                            y: d[`q${qy+1}`] 
+                        }));
+                        
+                        // Calculate regression
+                        const n = scatterData.length;
+                        if (n < 2) return; // Skip if not enough data
+                        
+                        const sumX = scatterData.reduce((s, p) => s + p.x, 0);
+                        const sumY = scatterData.reduce((s, p) => s + p.y, 0);
+                        const sumXY = scatterData.reduce((s, p) => s + p.x * p.y, 0);
+                        const sumX2 = scatterData.reduce((s, p) => s + p.x * p.x, 0);
+                        
+                        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                        const intercept = (sumY - slope * sumX) / n;
+                        
+                        regLine = [{ x: -1, y: slope * -1 + intercept }, { x: 1, y: slope * 1 + intercept }];
+                        
+                        xScale = { min: -1, max: 1, ticks: { color: '#c4b5fd', font: { size: 8 } }, grid: { color: 'rgba(34, 211, 238, 0.2)' } };
+                        yScale = { min: -1, max: 1, ticks: { color: '#c4b5fd', font: { size: 8 } }, grid: { color: 'rgba(34, 211, 238, 0.2)' } };
+                    }
+                    
+                    scatterChartRefs.current[idx] = new Chart(canvas, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [{
+                                label: 'Data',
+                                data: scatterData,
+                                backgroundColor: isAge ? 'rgba(147, 197, 253, 0.6)' : 'rgba(34, 211, 238, 0.6)',
+                                borderColor: isAge ? 'rgba(147, 197, 253, 1)' : 'rgba(34, 211, 238, 1)',
+                                pointRadius: isAge ? 4 : 3,
+                                pointHoverRadius: isAge ? 6 : 5
+                            }, {
+                                label: 'Best Fit',
+                                data: regLine,
+                                type: 'line',
+                                borderColor: 'rgba(251, 191, 36, 1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: {
+                                    display: true,
+                                    text: `${labelX} → ${labelY} | R²=${r2.toFixed(3)}`,
+                                    color: isAge ? '#93c5fd' : '#22d3ee', 
+                                    font: { size: 9, weight: 'bold' }
+                                }
+                            },
+                            scales: {
+                                x: xScale,
+                                y: yScale
+                            }
+                        }
+                    });
+                });
+
+                // Response timeline - Rolling mean confidence trend by submission timestamp (24h bin)
+                if (boxplotChartRef.current) { boxplotChartRef.current.destroy(); boxplotChartRef.current = null; }
+                const boxplotCanvas = document.getElementById('boxplot-chart');
+                if (boxplotCanvas) {
+                    // 24h binning by timestamp
+                    const timestamps = data.map(d => new Date(d.timestamp).getTime()).sort((a,b)=>a-b);
+                    const firstTime = timestamps[0];
+                    const lastTime = timestamps[timestamps.length - 1];
+                    const dayMs = 24 * 60 * 60 * 1000;
+                    const numBins = Math.max(1, Math.ceil((lastTime - firstTime + 1) / dayMs));
+                    const bins = Array(numBins).fill(0).map((_, i) => ({ start: firstTime + i*dayMs, end: firstTime + (i+1)*dayMs, values: [] }));
+                    data.forEach((d) => {
+                        const t = new Date(d.timestamp).getTime();
+                        const idx = Math.min(Math.floor((t - firstTime) / dayMs), numBins - 1);
+                        const meanVal = questions.reduce((acc, _, qIdx) => acc + d[`q${qIdx + 1}`], 0) / questions.length;
+                        bins[idx].values.push(meanVal);
+                    });
+                    const windowData = bins.map((b, i) => ({ x: i + 1, y: b.values.length ? (b.values.reduce((a,b)=>a+b,0)/b.values.length) : null })).filter(d => d.y !== null);
+
+                    boxplotChartRef.current = new Chart(boxplotCanvas, {
+                        type: 'line',
+                        data: {
+                            datasets: [{
+                                label: 'Mean Response',
+                                data: windowData,
+                                borderColor: 'rgba(34, 211, 238, 1)',
+                                backgroundColor: 'rgba(34, 211, 238, 0.2)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 4,
+                                pointHoverRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: true, text: 'Rolling Mean Confidence Trend by Submission Timestamp (24h bin)', color: '#22d3ee', font: { size: 16, weight: 'bold' } }
+                            },
+                            scales: {
+                                x: { title: { display: true, text: '24-Hour Bins (ordered)', color: '#c4b5fd' }, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } },
+                                y: { title: { display: true, text: 'Mean Confidence', color: '#c4b5fd' }, min: -1, max: 1, ticks: { color: '#c4b5fd' }, grid: { color: 'rgba(34, 211, 238, 0.2)' } }
+                            }
+                        }
+                    });
+                }
+
+                // PCA: Explained variance by component (bar)
+                if (pcaVarChartRef.current) { pcaVarChartRef.current.destroy(); pcaVarChartRef.current = null; }
+                const pcaVarCanvas = document.getElementById('pca-variance-chart');
+                if (pcaVarCanvas && analytics?.pca_components && analytics?.pca_variance) {
+                    pcaVarChartRef.current = new Chart(pcaVarCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: analytics.pca_components.map((c) => `C${c}`),
+                            datasets: [{
+                                label: 'Variance Ratio',
+                                data: analytics.pca_variance,
+                                backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                                borderColor: 'rgba(34, 197, 94, 1)',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: true, text: 'Explained Variance by Component', color: '#a7f3d0', font: { size: 16, weight: 'bold' } }
+                            },
+                            scales: {
+                                x: { ticks: { color: '#a7f3d0' }, grid: { color: 'rgba(16, 185, 129, 0.2)' } },
+                                y: { title: { display: true, text: 'Variance Ratio', color: '#a7f3d0' }, ticks: { color: '#a7f3d0' }, grid: { color: 'rgba(16, 185, 129, 0.2)' }, beginAtZero: true, max: 1 }
+                            }
+                        }
+                    });
+                }
+
+                // PCA Scree Plot (line)
+                if (pcaScreeChartRef.current) { pcaScreeChartRef.current.destroy(); pcaScreeChartRef.current = null; }
+                const pcaScreeCanvas = document.getElementById('pca-scree-chart');
+                if (pcaScreeCanvas && analytics?.pca_components && analytics?.pca_variance) {
+                    const cum = analytics.pca_variance.reduce((arr, v, i) => { arr.push((arr[i-1] || 0) + v); return arr; }, []);
+                    pcaScreeChartRef.current = new Chart(pcaScreeCanvas, {
+                        type: 'line',
+                        data: {
+                            labels: analytics.pca_components.map((c) => `C${c}`),
+                            datasets: [
+                                { label: 'Variance Ratio', data: analytics.pca_variance, borderColor: 'rgba(59, 130, 246, 1)', backgroundColor: 'rgba(59, 130, 246, 0.2)', borderWidth: 2, tension: 0.2, pointRadius: 3 },
+                                { label: 'Cumulative', data: cum, borderColor: 'rgba(251, 191, 36, 1)', backgroundColor: 'rgba(251, 191, 36, 0.2)', borderWidth: 2, tension: 0.2, pointRadius: 3 }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: true }, title: { display: true, text: 'PCA Scree Plot', color: '#bfdbfe', font: { size: 16, weight: 'bold' } } },
+                            scales: { x: { ticks: { color: '#bfdbfe' }, grid: { color: 'rgba(59, 130, 246, 0.2)' } }, y: { title: { display: true, text: 'Variance Ratio', color: '#bfdbfe' }, ticks: { color: '#bfdbfe' }, grid: { color: 'rgba(59, 130, 246, 0.2)' }, beginAtZero: true, max: 1 } }
+                        }
+                    });
+                }
+
+                return () => {
+                    if (covChartRef.current) { try { covChartRef.current.destroy(); } catch(e){} covChartRef.current = null; }
+                    scatterChartRefs.current.forEach(chart => { try { chart?.destroy(); } catch(e){} });
+                    scatterChartRefs.current = [];
+                    if (boxplotChartRef.current) { try { boxplotChartRef.current.destroy(); } catch(e){} boxplotChartRef.current = null; }
+                    if (pcaVarChartRef.current) { try { pcaVarChartRef.current.destroy(); } catch(e){} pcaVarChartRef.current = null; }
+                    if (pcaScreeChartRef.current) { try { pcaScreeChartRef.current.destroy(); } catch(e){} pcaScreeChartRef.current = null; }
+                };
+            }, [data, questions, topCount, analytics]);
+
+            if (data.length < 2) {
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-6">
+                        <div className="bg-gradient-to-br from-cyan-900 to-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-cyan-700">
+                            <p className="text-cyan-300 text-center py-8">Need at least 2 responses for statistical analysis</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            const topPairsForRender = getTopPairs().slice(0, topCount);
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    <div className="bg-gradient-to-br from-cyan-900 to-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-cyan-700">
+                        <h2 className="text-3xl font-bold text-cyan-100 mb-2">Advanced Statistical Analysis</h2>
+                        <p className="text-cyan-300 text-sm mb-6">Multivariate correlation, variance, and dimensional analysis</p>
+
+                        {/* Reliability and Sampling Adequacy */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div className="bg-cyan-900 bg-opacity-30 rounded-lg p-4 border border-cyan-700">
+                                <h3 className="text-lg font-bold text-cyan-100 mb-2">Internal Consistency (Cronbach’s α)</h3>
+                                <p className="text-cyan-100 text-2xl font-mono">{analytics?.cronbach_alpha !== undefined ? (Number(analytics.cronbach_alpha).toFixed(3)) : '—'}</p>
+                                <p className="text-xs text-cyan-300 mt-2">Cronbach’s α measures the internal consistency of a scale (0–1). Higher values indicate items measure the same underlying construct.</p>
+                            </div>
+                            <div className="bg-cyan-900 bg-opacity-30 rounded-lg p-4 border border-cyan-700">
+                                <h3 className="text-lg font-bold text-cyan-100 mb-2">Sampling Adequacy (KMO)</h3>
+                                <p className="text-cyan-100 text-2xl font-mono">{analytics?.kmo !== undefined ? (Number(analytics.kmo).toFixed(3)) : '—'}</p>
+                                <p className="text-xs text-cyan-300 mt-2">Kaiser-Meyer-Olkin (KMO) assesses suitability for factor analysis (0–1). Values ≥ 0.6 suggest adequate common variance for PCA/FA.</p>
+                            </div>
+                        </div>
+
+                        {/* Correlation Grid */}
+                        {analytics && (
+                            <div className="mb-6 bg-cyan-900 bg-opacity-30 rounded-lg p-4 border border-cyan-700">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-lg font-bold text-cyan-100">Correlation Matrix (Pearson r)</h3>
+                                    {analytics.columns_with_age && analytics.columns_with_age.length > 6 && (
+                                        <label className="flex items-center gap-2 text-sm text-cyan-200">
+                                            <input type="checkbox" checked={showAgeInMatrices} onChange={(e) => setShowAgeInMatrices(e.target.checked)} className="accent-cyan-500" />
+                                            <span>Include Age Bins</span>
+                                        </label>
+                                    )}
+                                </div>
+                                <div className="overflow-x-auto">
+                                    {(() => {
+                                        const displayCorr = showAgeInMatrices && analytics.corr_matrix_with_age ? analytics.corr_matrix_with_age : analytics.corr_matrix;
+                                        const displayCols = showAgeInMatrices && analytics.columns_with_age ? analytics.columns_with_age : analytics.columns;
+                                        return (
+                                            <table className="w-full text-xs table-fixed">
+                                                <thead>
+                                                    <tr className="border-b border-cyan-700">
+                                                        <th className="p-2 text-cyan-300 w-24"></th>
+                                                        {displayCols.map((name, i) => (
+                                                            <th key={i} className="p-2 text-cyan-300 w-20 overflow-hidden text-ellipsis whitespace-nowrap" title={name}>
+                                                                {name}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {displayCorr.map((row, i) => (
+                                                        <tr key={i} className="border-b border-cyan-800">
+                                                            <td className="p-2 font-bold text-cyan-300 w-24 overflow-hidden text-ellipsis whitespace-nowrap" title={displayCols[i]}>
+                                                                {displayCols[i]}
+                                                            </td>
+                                                            {row.map((val, j) => {
+                                                        // Gradient: green(1.0) → grey-yellow(0.0) → red(-1.0)
+                                                        let bgColor;
+                                                        if (val > 0) {
+                                                            // Positive: grey-yellow to green
+                                                            const intensity = val;
+                                                            bgColor = `rgba(34, 197, 94, ${0.3 + intensity * 0.7})`;
+                                                        } else if (val < 0) {
+                                                            // Negative: grey-yellow to red
+                                                            const intensity = Math.abs(val);
+                                                            bgColor = `rgba(239, 68, 68, ${0.3 + intensity * 0.7})`;
+                                                        } else {
+                                                            // Zero: grey-yellow
+                                                            bgColor = 'rgba(161, 161, 170, 0.5)';
+                                                        }
+                                                                return (
+                                                                    <td key={j} className="p-2 text-center matrix-cell text-white font-mono w-20" style={{backgroundColor: bgColor}}>
+                                                                        {val != null ? val.toFixed(2) : 'N/A'}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        );
+                                    })()}
+                                </div>
+                                <p className="text-xs text-cyan-300 mt-2">
+                                    <strong>Pearson r:</strong> Measures the strength and direction of linear relationship between two variables. 
+                                    Values range from -1 (perfect negative correlation) through 0 (no correlation) to +1 (perfect positive correlation).
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            {/* Variance Chart */}
+                            <div className="bg-purple-900 bg-opacity-30 rounded-lg p-4 border border-purple-700">
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="covariance-chart"></canvas>
+                                </div>
+                            </div>
+
+                            {/* Response Trend */}
+                            <div className="bg-cyan-900 bg-opacity-30 rounded-lg p-4 border border-cyan-700">
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="boxplot-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PCA Explained Variance and Scree Plot */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <div className="bg-emerald-900 bg-opacity-30 rounded-lg p-4 border border-emerald-700">
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="pca-variance-chart"></canvas>
+                                </div>
+                                <p className="text-xs text-emerald-200 mt-2">Variance Ratio by Component shows how much variability each principal component explains. Higher bars indicate more informative components.</p>
+                            </div>
+                            <div className="bg-blue-900 bg-opacity-30 rounded-lg p-4 border border-blue-700">
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="pca-scree-chart"></canvas>
+                                </div>
+                                <p className="text-xs text-blue-200 mt-2">Scree Plot visualizes explained variance per component and cumulative variance to guide how many components to retain.</p>
+                            </div>
+                        </div>
+
+                        {/* Question vs Question Scatter Plots (Top N by |R²|) */}
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-lg font-bold text-cyan-100">Top Correlations by |R²|</h3>
+                            <div className="text-cyan-200 text-sm flex items-center gap-2">
+                                <span>Show</span>
+                                <select value={topCount} onChange={(e)=>setTopCount(parseInt(e.target.value))} className="bg-cyan-800 border border-cyan-600 rounded px-2 py-1">
+                                    <option value={4}>4</option>
+                                    <option value={8}>8</option>
+                                    <option value={16}>16</option>
+                                    <option value={30}>30</option>
+                                    <option value={36}>36</option>
+                                </select>
+                                <span>charts</span>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-6">
+                            {topPairsForRender.map((pair, i) => (
+                                <div key={`${pair.qx}-${pair.qy}`} className="bg-cyan-900 bg-opacity-30 rounded-lg p-1 border border-cyan-700">
+                                    <div style={{ height: '150px' }}>
+                                        <canvas id={`scatter-chart-${i}`}></canvas>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Covariance Matrix */}
+                        {analytics && (
+                            <div className="mb-6 bg-purple-900 bg-opacity-30 rounded-lg p-4 border border-purple-700">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-lg font-bold text-purple-100">Covariance Matrix</h3>
+                                    {analytics.columns_with_age && analytics.columns_with_age.length > 6 && (
+                                        <label className="flex items-center gap-2 text-sm text-purple-200">
+                                            <input type="checkbox" checked={showAgeInMatrices} onChange={(e) => setShowAgeInMatrices(e.target.checked)} className="accent-purple-500" />
+                                            <span>Include Age Bins</span>
+                                        </label>
+                                    )}
+                                </div>
+                                <div className="overflow-x-auto">
+                                    {(() => {
+                                        const displayCov = showAgeInMatrices && analytics.cov_matrix_with_age ? analytics.cov_matrix_with_age : analytics.cov_matrix;
+                                        const displayCols = showAgeInMatrices && analytics.columns_with_age ? analytics.columns_with_age : analytics.columns;
+                                        const maxCov = Math.max(...displayCov.flat().map(v => Math.abs(v || 0)));
+                                        return (
+                                            <table className="w-full text-xs table-fixed">
+                                                <thead>
+                                                    <tr className="border-b border-purple-700">
+                                                        <th className="p-2 text-purple-300 w-24"></th>
+                                                        {displayCols.map((name, i) => (
+                                                            <th key={i} className="p-2 text-purple-300 w-20 overflow-hidden text-ellipsis whitespace-nowrap" title={name}>
+                                                                {name}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {displayCov.map((row, i) => (
+                                                        <tr key={i} className="border-b border-purple-800">
+                                                            <td className="p-2 font-bold text-purple-300 w-24 overflow-hidden text-ellipsis whitespace-nowrap" title={displayCols[i]}>
+                                                                {displayCols[i]}
+                                                            </td>
+                                                            {row.map((val, j) => {
+                                                                if (val == null) {
+                                                                    return <td key={j} className="p-2 text-center text-white font-mono">N/A</td>;
+                                                                }
+                                                                // Display actual covariance values
+                                                                const absVal = Math.abs(val);
+                                                                const intensity = Math.min(absVal / maxCov, 1);
+                                                                const isPositive = val >= 0;
+                                                                
+                                                                // Color based on sign and intensity
+                                                                let bgColor;
+                                                                if (i === j) {
+                                                                    // Diagonal (variance) - use blue
+                                                                    bgColor = `rgba(139, 92, 246, ${0.3 + intensity * 0.7})`;
+                                                                } else if (isPositive) {
+                                                                    // Positive covariance - green
+                                                                    bgColor = `rgba(34, 197, 94, ${0.2 + intensity * 0.8})`;
+                                                                } else {
+                                                                    // Negative covariance - red
+                                                                    bgColor = `rgba(239, 68, 68, ${0.2 + intensity * 0.8})`;
+                                                                }
+                                                                
+                                                                return (
+                                                                    <td key={j} className="p-2 text-center matrix-cell text-white font-mono w-20" style={{backgroundColor: bgColor}}>
+                                                                        {val.toFixed(3)}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        );
+                                    })()}
+                                </div>
+                                <p className="text-xs text-purple-300 mt-2">
+                                    <strong>Covariance:</strong> Shows how variables change together. Positive values indicate variables increase together, 
+                                    negative values indicate inverse relationship. Diagonal values are variances (σ²).
+                                </p>
+                                <p className="text-xs text-purple-400 mt-1">Diagonal: Variance (σ²) | Green: Positive covariance | Red: Negative covariance | Intensity: Magnitude</p>
+                            </div>
+                        )}
+
+                        <div className="mt-6 text-xs text-cyan-400 space-y-1">
+                            <p>• <strong>Sample Size:</strong> n = {data.length} responses</p>
+                            <p>• <strong>Trend Analysis:</strong> Shows overall confidence evolution over 24-hour time windows</p>
+                            <p>• <strong>Scatter Plots:</strong> Q vs Q pairs (30) + Q (X-axis) vs Age (Y-axis) pairs (6 if age data available). Age shown on categorical 0-4 scale (Teen, Ugrad, Grad, Work, Older). Sorted by |R²|.</p>
+                        </div>
+                    </div>
                 </div>
             );
         };
 
         // Render the app
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        try {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        } catch (error) {
+            console.error('Failed to render app:', error);
+            document.getElementById('root').innerHTML = `
+                <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(to bottom right, #581c87, #312e81); color: white; font-family: sans-serif; padding: 20px;">
+                    <div style="text-align: center; max-width: 600px;">
+                        <h1>Error Loading Survey</h1>
+                        <p style="color: #fbbf24;">Error: ${error.message}</p>
+                    </div>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>
-

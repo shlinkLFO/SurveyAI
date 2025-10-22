@@ -1,0 +1,61 @@
+<section id="advanced-analytics" class="analysis-section">
+    <h2>Advanced Analytics v0.2</h2>
+    <p><em>Generated from synthetic demo data (Admin only)</em></p>
+  
+    <h3>Interactive Correlation Heatmap</h3>
+    <div id="heatmap"></div>
+  
+    <h3>Principal Component Analysis (PCA)</h3>
+    <p>Shows dimensional reduction of survey responses and explained variance ratios.</p>
+    <div id="pcaChart"></div>
+  
+    <h3>Internal Consistency</h3>
+    <p>Cronbach’s α (reliability index): <span id="cronbachAlpha"></span></p>
+  
+    <h3>Regression Summary</h3>
+    <pre id="regressionResults"></pre>
+  
+    <script src="https://cdn.plot.ly/plotly-2.33.0.min.js"></script>
+    <script>
+      // Fetch analytic JSON from FastAPI endpoint (prefix for subdir deploy)
+      const API_BASE = '/SurveyAI-UIUC/api';
+      fetch(`${API_BASE}/analytics`)
+        .then(r => r.json())
+        .then(data => {
+          // Watermark for synthetic/demo data
+          const wm = document.createElement('div');
+          wm.textContent = `Admin Demo Data: Nonrepresentative (n = ${data.n ?? 'NA'})`;
+          wm.style.position = 'fixed';
+          wm.style.bottom = '10px';
+          wm.style.right = '10px';
+          wm.style.padding = '6px 10px';
+          wm.style.background = 'rgba(255,255,255,0.2)';
+          wm.style.color = '#111827';
+          wm.style.fontSize = '12px';
+          wm.style.backdropFilter = 'blur(4px)';
+          wm.style.borderRadius = '6px';
+          document.body.appendChild(wm);
+
+          Plotly.newPlot("heatmap", [{
+            z: data.corr_matrix,
+            x: data.columns,
+            y: data.columns,
+            type: "heatmap",
+            colorscale: "RdBu",
+            zmid: 0
+          }], {title: "Pearson Correlation (r)"});
+  
+          Plotly.newPlot("pcaChart", [{
+            x: data.pca_components,
+            y: data.pca_variance,
+            type: "bar"
+          }], {title: "Explained Variance by Component", xaxis:{title:"Component"}, yaxis:{title:"Variance Ratio"}});
+  
+          document.getElementById("cronbachAlpha").textContent =
+            data.cronbach_alpha.toFixed(3);
+          document.getElementById("regressionResults").textContent =
+            data.regression_summary;
+        });
+    </script>
+  </section>
+  

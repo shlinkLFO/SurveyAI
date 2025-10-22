@@ -1,0 +1,18 @@
+# Proxy to local uvicorn server
+RewriteEngine On
+
+# Allow static files to be served directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Proxy API requests to uvicorn on port 8000
+RewriteCond %{REQUEST_URI} ^/SurveyAIUIUC/
+RewriteRule ^(.*)$ http://127.0.0.1:8000/$1 [P,L]
+
+# Enable proxy
+<IfModule mod_proxy.c>
+    ProxyPreserveHost On
+    ProxyPass /SurveyAIUIUC http://127.0.0.1:8000/SurveyAIUIUC
+    ProxyPassReverse /SurveyAIUIUC http://127.0.0.1:8000/SurveyAIUIUC
+</IfModule>

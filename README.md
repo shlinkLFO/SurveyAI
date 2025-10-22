@@ -1,106 +1,217 @@
-# AI Confidence Survey
+# AI Confidence Survey - UIUC MS Business Analytics
 
-A web application for collecting AI confidence survey data with centralized storage and analytics.
+FastAPI-powered survey application with advanced statistical analysis using Python's scientific computing stack.
 
-## Features
+## 🚀 Live Application
 
-- 6-question confidence survey with slider inputs (-1 to +1 scale)
-- Centralized data storage across all users
-- Locked tabs until survey completion
-- After submission: access to dataset, correlation heatmap, and distributions
-- Hidden admin panel for data management
-- Password-protected admin access
-
-## Live Application
-
-- **Survey**: https://survey.glowstone.red/
-- **Admin**: https://survey.glowstone.red/84Metashosan (hidden, password required)
+- **Survey**: https://glowstone.red/SurveyAIUIUC
+- **Admin Panel**: https://glowstone.red/SurveyAIUIUC/admin (password protected)
 - **GitHub**: https://github.com/shlinkLFO/SurveyAI
 
-## Files
+## ✨ Features
 
-### Application Files
-- `index.html` - Main survey interface
-- `84Metashosan.html` - Hidden admin panel
-- `server.js` - Node.js/Express backend API
-- `package.json` - Dependencies
-- `.gitignore` - Git ignore rules
+- **Interactive Survey**: 6 AI-related confidence questions with slider inputs (-1 to +1 scale)
+- **Real-time Visualizations**: Histograms with mean indicators using Chart.js
+- **Multivariate Regression**: Python-powered OLS/Ridge regression with statsmodels
+- **Advanced Analytics**: Correlation matrices, covariance analysis, PCA
+- **Admin Dashboard**: Data management, export, and synthetic data generation
+- **RESTful API**: Clean FastAPI backend with automatic documentation
 
-### Documentation
-See `/docs` folder for detailed deployment and troubleshooting guides.
+## 📊 Technical Stack
 
-## Quick Start (Local Development)
+**Backend:**
+- FastAPI (Python 3.9+)
+- Statsmodels & Scikit-learn for regression
+- Pandas & NumPy for data processing
+- Uvicorn ASGI server
+
+**Frontend:**
+- React 18 (via CDN)
+- Chart.js for visualizations
+- Tailwind CSS for styling
+- Babel Standalone for JSX
+
+**Deployment:**
+- cPanel/Passenger support (NameCheap Stellar)
+- Systemd service for VPS
+- JSON file storage
+
+## 🎯 Key Upgrade: JavaScript → Python
+
+**Why we switched from Node.js to FastAPI:**
+
+✅ **Better Statistics**: Native support for advanced regression analysis  
+✅ **Handles Multicollinearity**: Automatic fallback to Ridge regression  
+✅ **Numerical Stability**: Python's scientific libraries are industry-standard  
+✅ **P-values & T-stats**: Proper statistical inference with statsmodels  
+✅ **Faster Development**: Rich ecosystem for data science  
+
+## 📁 Project Structure
+
+```
+SurveyAI/
+├── main.py                 # FastAPI backend with regression endpoints
+├── passenger_wsgi.py       # cPanel/Passenger entry point
+├── index.html             # Main survey interface
+├── 84Metashosan.html      # Admin panel
+├── requirements.txt        # Python dependencies
+├── .htaccess              # Apache/Passenger configuration
+├── survey-data.json       # Data storage (not in repo)
+├── docs/                  # Deployment guides
+│   ├── CPANEL_DEPLOYMENT.md
+│   ├── DEPLOYMENT.md
+│   ├── QUICK_START_CPANEL.md
+│   └── START_HERE.txt
+├── install.sh             # Local installation script
+├── start.sh               # Development server launcher
+└── surveyai.service       # Systemd service file
+```
+
+## 🚀 Quick Start
+
+### Local Development
 
 ```bash
 # Install dependencies
-npm install
+pip install -r requirements.txt
 
-# Create .env file
-echo "ADMIN_PASSWORD=your_password" > .env
-echo "PORT=3000" >> .env
+# Run the application
+python main.py
+# or
+uvicorn main:app --reload
 
-# Start server
-npm start
-
-# Access at: http://localhost:3000
+# Access at http://localhost:8000
 ```
 
-## Deployment
+### cPanel Deployment (NameCheap Stellar)
 
-Deployed on Namecheap cPanel with Node.js hosting.
+See **[docs/QUICK_START_CPANEL.md](docs/QUICK_START_CPANEL.md)** for 5-minute deployment guide.
 
-**Requirements:**
-- Node.js 16.x or higher
-- Express, CORS, dotenv packages
+### VPS/SSH Deployment
 
-**Quick Deploy:**
-1. Upload all files to `/home/shlinky/ServeyAILL6/`
-2. Create Node.js app in cPanel
-3. Set environment variables: `ADMIN_PASSWORD`, `PORT`
-4. Run NPM Install
-5. Start app
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for full deployment instructions.
 
-See `/docs/NAMECHEAP_DEPLOY.md` for detailed instructions.
+## 📡 API Endpoints
 
-## Technology Stack
-
-**Frontend:**
-- React 18 (CDN)
-- Recharts for visualizations
-- Tailwind CSS
-- Babel Standalone for JSX
-
-**Backend:**
-- Node.js + Express
-- JSON file storage
-- RESTful API
-- CORS enabled
-
-## API Endpoints
-
-- `POST /api/responses` - Submit survey response
-- `GET /api/responses` - Get all responses
-- `GET /api/count` - Get response count
-- `POST /api/admin/clear` - Clear all data (admin only)
+- `GET /` - Main survey page
+- `GET /admin` - Admin panel
+- `GET /api/responses` - Get all survey responses
+- `POST /api/submit` - Submit new response
+- `GET /api/regression` - Get regression analysis
 - `POST /api/admin/export` - Export data (admin only)
+- `POST /api/admin/clear` - Clear all data (admin only)
+- `POST /api/admin/generate` - Generate sample data (admin only)
 
-## Security
+Full API docs available at `/docs` when running the server.
 
-- Admin panel hidden (not linked from main page)
-- Password-protected admin endpoints
-- Users cannot delete data
-- All responses stored server-side
+## 🔒 Security
 
-## Data Storage
+- Admin endpoints protected by password authentication
+- SHA-256 password hashing
+- Hidden admin panel (not linked from main page)
+- CORS enabled for cross-origin requests
+- Data stored server-side only
 
-Survey responses stored in `survey-data.json` on server (not in repository).
+**Default admin password**: `password` (CHANGE THIS!)
 
-**Backup:** Regularly backup this file from the server.
+To update password, edit `main.py` line 22:
+```python
+import hashlib
+ADMIN_PASSWORD_HASH = hashlib.sha256(b"your_new_password").hexdigest()
+```
 
-## License
+## 📊 Survey Questions
 
-MIT
+1. As of today, humans have access to sentient AI
+2. AI will outperform humans on a standardized exam for Emotional Intelligence: EQ by 2030
+3. I could compete in the job market without leveraging AI
+4. A child born Fall 2025 will complete HS in Spring of 2044...
+5. I understand how Machine Learning AI models make decisions
+6. AI will have a net positive impact on your closest social circle/s in a decade
 
-## Research
+## 🔬 Research Application
 
-UIUC MS Business Analytics Research Project
+**UIUC MS Business Analytics Research Project**
+
+This application is designed to collect confidence scores on AI-related statements and perform multivariate statistical analysis to understand relationships between different dimensions of AI confidence.
+
+## 📈 Analytics Features
+
+**Distributions Page:**
+- Histograms with 0.25 bin size
+- Red vertical line showing mean
+- Mean and standard deviation displayed
+
+**Regression Page:**
+- 6 multivariate regression models
+- Each question predicted by the other 5
+- Beta coefficients, standard errors, t-statistics
+- P-values and significance indicators
+- Adjusted R², R², RMSE
+
+**Advanced Analytics:**
+- Pearson correlation matrix
+- Covariance matrix (color-coded)
+- Variance analysis by question
+- PCA visualization
+- Confidence trend over time
+
+## 🛠️ Development
+
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run in development mode with auto-reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Run tests (if implemented)
+pytest
+```
+
+## 📝 Data Format
+
+Survey responses are stored in JSON format:
+```json
+{
+  "responses": [
+    {
+      "timestamp": "2025-10-21T12:00:00Z",
+      "q1": 0.5,
+      "q2": -0.3,
+      "q3": 0.1,
+      "q4": 0.2,
+      "q5": -0.4,
+      "q6": 0.6
+    }
+  ]
+}
+```
+
+## 🤝 Contributing
+
+This is a research project. For questions or issues:
+1. Open an issue on GitHub
+2. Contact the research team
+
+## 📄 License
+
+MIT License - See LICENSE file for details
+
+## 👥 Authors
+
+UIUC MS Business Analytics Program
+
+## 🔗 Links
+
+- **Live Application**: https://glowstone.red/SurveyAIUIUC
+- **GitHub Repository**: https://github.com/shlinkLFO/SurveyAI
+- **UIUC Gies College of Business**: https://giesbusiness.illinois.edu/
+
+---
+
+**Previous Version**: This project was previously built with Node.js/Express. See git history for the JavaScript version. The current Python/FastAPI version provides superior statistical analysis capabilities.
