@@ -438,6 +438,35 @@ async def admin_get_reminders(auth: AdminAuth):
     reminder_data = load_reminders()
     return JSONResponse(content=reminder_data.get("reminders", []))
 
+class DeleteResponseRequest(BaseModel):
+    password: str
+    timestamp: str
+
+@app.post("/api/admin/delete")
+async def admin_delete_response(request: DeleteResponseRequest):
+    """Delete a specific response by timestamp (admin only)"""
+    if not verify_admin_password(request.password):
+        raise HTTPException(status_code=403, detail="Invalid password")
+    
+    data = load_data()
+    responses = data.get("responses", [])
+    
+    # Filter out the response with matching timestamp
+    original_count = len(responses)
+    data["responses"] = [r for r in responses if r.get("timestamp") != request.timestamp]
+    new_count = len(data["responses"])
+    
+    if original_count == new_count:
+        raise HTTPException(status_code=404, detail="Response not found")
+    
+    save_data(data)
+    
+    return JSONResponse(content={
+        "success": True,
+        "deleted": original_count - new_count,
+        "remaining": new_count
+    })
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

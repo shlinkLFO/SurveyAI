@@ -247,6 +247,33 @@
                 }
             };
 
+            const calculateZScores = (data) => {
+                // Calculate z-scores for each question across all responses
+                const numQuestions = 6;
+                const zScores = [];
+                
+                for (let qIdx = 0; qIdx < numQuestions; qIdx++) {
+                    const values = data.map(d => d[`q${qIdx + 1}`]).filter(v => v != null);
+                    
+                    if (values.length === 0) {
+                        zScores.push(data.map(() => 0));
+                        continue;
+                    }
+                    
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+                    const std = Math.sqrt(variance);
+                    
+                    zScores.push(data.map(d => {
+                        const val = d[`q${qIdx + 1}`];
+                        if (val == null || std === 0) return 0;
+                        return (val - mean) / std;
+                    }));
+                }
+                
+                return zScores;
+            };
+
             const exportCSV = () => {
                 if (allData.length === 0) {
                     alert('No data to export');
@@ -329,19 +356,34 @@
                             <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
                                 <h1 className="text-2xl font-bold text-purple-100 mb-2">AI Confidence Survey</h1>
                                 <p className="text-sm text-purple-300 mb-6">UIUC MS Business Analytics Research</p>
-                                <p className="text-xs text-purple-400 mb-6 italic">Rate your confidence: Left (-1) = No confidence, Right (+1) = Full confidence, Center (0.00) = Neutral (Lean Left if Unsure)</p>
+                                <div className="text-xs text-purple-400 mb-6 italic leading-relaxed">
+                                    <p className="font-bold mb-1">Rate your confidence:</p>
+                                    <p className="mb-1">Left (-1) = Unsure | No Confidence</p>
+                                    <p className="mb-1">Right (+1) = Extremely Confident</p>
+                                    <p className="font-bold">Center (±0.00) = Neutral | Some Confidence</p>
+                                </div>
 
-                                {/* Demographics: Age Group */}
+                                {/* Demographics: Age Group Dropdown */}
                                 <div className="mb-6">
-                                    <p className="text-sm font-semibold text-purple-100 mb-2">Select your age group:</p>
-                                    <div className="grid grid-cols-2 gap-3 text-purple-200 text-sm">
-                                        {['16-18','19-22','23-26','27-40','40+'].map((label) => (
-                                            <label key={label} className="flex items-center gap-2">
-                                                <input type="radio" name="age_group" value={label} onChange={(e)=>{ setAgeGroup(e.target.value); window.__age_group=e.target.value; }} className="accent-purple-500" />
-                                                <span>{label}</span>
-                                            </label>
-                                        ))}
-                                    </div>
+                                    <select 
+                                        value={ageGroup}
+                                        onChange={(e) => { setAgeGroup(e.target.value); window.__age_group=e.target.value; }}
+                                        className="w-full px-4 py-2 rounded bg-purple-800 border border-purple-600 text-purple-100 placeholder-purple-400 focus:outline-none focus:border-purple-400"
+                                        style={{
+                                            appearance: 'none',
+                                            backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'rgb(196, 181, 253)\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                                            backgroundRepeat: 'no-repeat',
+                                            backgroundPosition: 'right 0.5rem center',
+                                            backgroundSize: '1.5em 1.5em'
+                                        }}
+                                    >
+                                        <option value="" disabled>Select your age group</option>
+                                        <option value="16-18">16-18</option>
+                                        <option value="19-22">19-22</option>
+                                        <option value="23-26">23-26</option>
+                                        <option value="27-40">27-40</option>
+                                        <option value="40+">40+</option>
+                                    </select>
                                 </div>
 
                                 {questions.map((question, idx) => (
@@ -374,27 +416,58 @@
                                 </div>
                                 <p className="text-purple-300 mb-4">Total Responses: {allData.length}</p>
                                 {allData.length > 0 && (
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full text-sm">
-                                            <thead className="bg-purple-800 bg-opacity-50">
-                                                <tr>
-                                                    <th className="px-4 py-2 text-left text-purple-200">Timestamp</th>
-                                                    <th className="px-4 py-2 text-left text-purple-200">Age</th>
-                                                    {questionShortNames.map((name, idx) => (<th key={idx} className="px-4 py-2 text-left text-purple-200">{name}</th>))}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {allData.slice(-10).reverse().map((entry, idx) => (
-                                                    <tr key={idx} className="border-t border-purple-700">
-                                                        <td className="px-4 py-2 text-purple-200">{new Date(entry.timestamp).toLocaleString()}</td>
-                                                        <td className="px-4 py-2 text-purple-200">{entry.age_group || '—'}</td>
-                                                        {questions.map((_, qIdx) => (<td key={qIdx} className="px-4 py-2 text-purple-200">{entry[`q${qIdx + 1}`].toFixed(2)}</td>))}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                        {allData.length > 10 && (<p className="text-xs text-purple-400 mt-2 text-center">Showing 10 most recent responses</p>)}
-                                    </div>
+                                    <>
+                                        <div className="mb-3 flex items-center gap-4 text-xs">
+                                            <span className="text-purple-300 font-semibold">Outlier Legend:</span>
+                                            <span className="px-3 py-1 rounded" style={{backgroundColor: 'rgba(236, 72, 153, 0.5)'}}>Pink: |Z| ≥ 2.24</span>
+                                            <span className="px-3 py-1 rounded" style={{backgroundColor: 'rgba(220, 38, 38, 0.5)'}}>Red: |Z| ≥ 2.89</span>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            {(() => {
+                                                const zScores = calculateZScores(allData);
+                                                const displayData = allData.slice(-10).reverse();
+                                                return (
+                                                    <table className="min-w-full text-sm">
+                                                        <thead className="bg-purple-800 bg-opacity-50">
+                                                            <tr>
+                                                                <th className="px-4 py-2 text-left text-purple-200">Timestamp</th>
+                                                                <th className="px-4 py-2 text-left text-purple-200">Age</th>
+                                                                {questionShortNames.map((name, idx) => (<th key={idx} className="px-4 py-2 text-left text-purple-200">{name}</th>))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {displayData.map((entry, displayIdx) => {
+                                                                const fullIdx = allData.findIndex(e => e.timestamp === entry.timestamp);
+                                                                return (
+                                                                    <tr key={displayIdx} className="border-t border-purple-700">
+                                                                        <td className="px-4 py-2 text-purple-200">{new Date(entry.timestamp).toLocaleString()}</td>
+                                                                        <td className="px-4 py-2 text-purple-200">{entry.age_group || '—'}</td>
+                                                                        {questions.map((_, qIdx) => {
+                                                                            const val = entry[`q${qIdx + 1}`];
+                                                                            const zScore = fullIdx >= 0 ? zScores[qIdx][fullIdx] : 0;
+                                                                            const absZ = Math.abs(zScore);
+                                                                            let bgColor = '';
+                                                                            if (absZ >= 2.89) {
+                                                                                bgColor = 'rgba(220, 38, 38, 0.5)'; // Red
+                                                                            } else if (absZ >= 2.24) {
+                                                                                bgColor = 'rgba(236, 72, 153, 0.5)'; // Pink
+                                                                            }
+                                                                            return (
+                                                                                <td key={qIdx} className="px-4 py-2 text-purple-200" style={{backgroundColor: bgColor}}>
+                                                                                    {val.toFixed(2)}
+                                                                                </td>
+                                                                            );
+                                                                        })}
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                );
+                                            })()}
+                                            {allData.length > 10 && (<p className="text-xs text-purple-400 mt-2 text-center">Showing 10 most recent responses</p>)}
+                                        </div>
+                                    </>
                                 )}
                                 {allData.length === 0 && (<p className="text-purple-400 text-center py-8">No data collected yet</p>)}
                             </div>
@@ -507,23 +580,40 @@
                     const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
                     const std = Math.sqrt(variance);
 
-                    // Create bins with size 0.25
-                    const binSize = 0.25;
-                    const bins = {};
-                    for (let i = -1; i <= 1; i += binSize) {
-                        bins[i.toFixed(2)] = 0;
+                    // Create 9 equal-width bins from -1 to +1 (static width = 2/9 ≈ 0.222)
+                    const numBins = 9;
+                    const binWidth = 2 / numBins;
+                    const bins = [];
+                    const binLabels = [];
+                    
+                    for (let i = 0; i < numBins; i++) {
+                        const binStart = -1 + i * binWidth;
+                        const binEnd = binStart + binWidth;
+                        const binMedian = binStart + binWidth / 2;
+                        
+                        // First and last bins show range, middle bins show median
+                        if (i === 0 || i === numBins - 1) {
+                            binLabels.push(`${binStart.toFixed(2)}-${binEnd.toFixed(2)}`);
+                        } else if (i === Math.floor(numBins / 2)) {
+                            // Center bin gets special label
+                            binLabels.push('Neutral : ±0.00');
+                        } else {
+                            binLabels.push(binMedian.toFixed(2));
+                        }
+                        bins.push(0);
                     }
 
                     // Count values in each bin
                     values.forEach(v => {
-                        const binKey = (Math.floor(v / binSize) * binSize).toFixed(2);
-                        if (bins[binKey] !== undefined) {
-                            bins[binKey]++;
-                        }
+                        // Map value to bin index: which bin does v belong to?
+                        let binIndex = Math.floor((v + 1) / binWidth);
+                        // Handle edge case: v === 1.0 should go in last bin
+                        if (binIndex >= numBins) binIndex = numBins - 1;
+                        if (binIndex < 0) binIndex = 0;
+                        bins[binIndex]++;
                     });
 
-                    const binLabels = Object.keys(bins);
-                    const binCounts = Object.values(bins);
+                    const binCounts = bins;
 
                     // Plugin to draw vertical mean line at precise position
                     const meanLinePlugin = {
@@ -586,7 +676,12 @@
                             scales: {
                                 x: { 
                                     title: { display: true, text: 'Confidence Value', color: '#c4b5fd' },
-                                    ticks: { color: '#c4b5fd', maxRotation: 45, minRotation: 45 }, 
+                                    ticks: { 
+                                        color: '#c4b5fd', 
+                                        maxRotation: 50, 
+                                        minRotation: 50,
+                                        font: { size: 9 }
+                                    }, 
                                     grid: { color: 'rgba(107, 33, 168, 0.2)' }
                                 },
                                 y: { 
@@ -620,7 +715,7 @@
                 <div className="max-w-7xl mx-auto px-4 py-6">
                     <div className="bg-purple-900 bg-opacity-50 backdrop-blur rounded-lg shadow-2xl p-6 border border-purple-700">
                         <h2 className="text-2xl font-bold text-purple-100 mb-2">Response Distributions</h2>
-                        <p className="text-purple-300 text-sm mb-6">Histograms with bin size 0.25 showing mean and standard deviation</p>
+                        <p className="text-purple-300 text-sm mb-6">Histograms with 9 equal-width bins (width ≈ 0.22) showing mean and standard deviation</p>
                         <div className="bg-purple-800 bg-opacity-30 rounded-lg p-4 border border-purple-700 mb-6">
                             <div style={{ height: '220px' }}>
                                 <canvas id="age-histogram"></canvas>

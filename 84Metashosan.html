@@ -152,6 +152,11 @@
 
                         <div id="data-preview" class="bg-gray-700 rounded-lg p-6 mb-6">
                             <h2 class="text-xl font-bold text-white mb-4">Recent Responses (Last 10)</h2>
+                            <div class="mb-3 flex items-center gap-4 text-xs">
+                                <span class="text-gray-300">Outlier Legend:</span>
+                                <span class="px-3 py-1 rounded" style="background-color: rgba(236, 72, 153, 0.5);">Pink: |Z| ≥ 2.24</span>
+                                <span class="px-3 py-1 rounded" style="background-color: rgba(220, 38, 38, 0.5);">Red: |Z| ≥ 2.89</span>
+                            </div>
                             <div id="data-table" class="overflow-x-auto">
                                 <p class="text-gray-400">Loading...</p>
                             </div>
@@ -238,6 +243,9 @@
         }
 
         function updateDashboard(data) {
+            // Store full dataset for z-score calculations
+            window.fullDataset = data;
+            
             document.getElementById('total-count').textContent = data.length;
             
             if (data.length > 0) {
@@ -260,6 +268,10 @@
                 "Q6: Social impact by 2035"
             ];
 
+            // Calculate z-scores for outlier detection
+            const allData = window.fullDataset || data;
+            const zScores = calculateZScores(allData);
+
             const html = `
                 <table class="min-w-full text-sm">
                     <thead class="bg-gray-800">
@@ -267,21 +279,102 @@
                             <th class="px-3 py-2 text-left text-gray-300">Timestamp</th>
                             <th class="px-3 py-2 text-left text-gray-300">Age</th>
                             ${questions.map(q => `<th class="px-3 py-2 text-left text-gray-300">${q}</th>`).join('')}
+                            <th class="px-3 py-2 text-center text-gray-300">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="text-gray-200">
-                        ${data.map(entry => `
+                        ${data.map((entry, rowIdx) => {
+                            const fullIdx = allData.findIndex(e => e.timestamp === entry.timestamp);
+                            return `
                             <tr class="border-t border-gray-600">
                                 <td class="px-3 py-2">${new Date(entry.timestamp).toLocaleString()}</td>
                                 <td class="px-3 py-2">${entry.age_group || '—'}</td>
-                                ${questions.map((_, idx) => `<td class="px-3 py-2">${entry[`q${idx + 1}`]?.toFixed(2) || 'N/A'}</td>`).join('')}
+                                ${questions.map((_, qIdx) => {
+                                    const val = entry[`q${qIdx + 1}`];
+                                    const zScore = fullIdx >= 0 ? zScores[qIdx][fullIdx] : 0;
+                                    const absZ = Math.abs(zScore);
+                                    let bgColor = '';
+                                    if (absZ >= 2.89) {
+                                        bgColor = 'background-color: rgba(220, 38, 38, 0.5);'; // Red
+                                    } else if (absZ >= 2.24) {
+                                        bgColor = 'background-color: rgba(236, 72, 153, 0.5);'; // Pink
+                                    }
+                                    return `<td class="px-3 py-2" style="${bgColor}">${val?.toFixed(2) || 'N/A'}</td>`;
+                                }).join('')}
+                                <td class="px-3 py-2 text-center">
+                                    <button 
+                                        onclick="deleteResponse('${entry.timestamp}')" 
+                                        class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs transition"
+                                        title="Delete this response"
+                                    >
+                                        Delete
+                                    </button>
+                                </td>
                             </tr>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
 
             document.getElementById('data-table').innerHTML = html;
+        }
+
+        function calculateZScores(data) {
+            // Calculate z-scores for each question across all responses
+            const questions = 6;
+            const zScores = [];
+            
+            for (let qIdx = 0; qIdx < questions; qIdx++) {
+                const values = data.map(d => d[`q${qIdx + 1}`]).filter(v => v != null);
+                
+                if (values.length === 0) {
+                    zScores.push(data.map(() => 0));
+                    continue;
+                }
+                
+                const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+                const std = Math.sqrt(variance);
+                
+                zScores.push(data.map(d => {
+                    const val = d[`q${qIdx + 1}`];
+                    if (val == null || std === 0) return 0;
+                    return (val - mean) / std;
+                }));
+            }
+            
+            return zScores;
+        }
+
+        async function deleteResponse(timestamp) {
+            if (!confirm(`Are you sure you want to delete the response from ${new Date(timestamp).toLocaleString()}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/delete`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        password: adminPassword,
+                        timestamp: timestamp
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Response deleted successfully! ${result.remaining} responses remaining.`);
+                    loadDashboardData();
+                } else {
+                    const error = await response.json();
+                    alert('Failed to delete response: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error deleting response: ' + error.message);
+            }
         }
 
         function updateReminders(reminders) {
